@@ -120,6 +120,166 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
         results["decision"] = "Insufficient observations after alignment"
         return results
 
+    y_order_res = determine_integration_order(y, max_diff=max_diff, regression=regression)
+    x_order_res = determine_integration_order(x, max_diff=max_diff, regression=regression)
+
+    y_order = y_order_res["order"]
+    x_order = x_order_res["order"]
+
+    results["asset_y_integration"] = y_order_res
+    results["asset_x_integration"] = x_order_res
+    results["same_order_integration"] = (y_order == x_order)
+
+    if y_order is None or x_order is None:
+        results["decision"] = "Integration order could not be determined"
+        return results
+
+    if y_order != 1 or x_order != 1:
+        results["decision"] = "Both series are not I(1), so standard Engle-Granger is not appropriate"
+        return results
+
+    ols_model, residuals = run_ols(y, x)
+    residual_adf = adf_test(residuals, regression=regression)
+    cointegrated = residual_adf["is_stationary_5pct"]
+
+    params = ols_model.params
+    pvalues = ols_model.pvalues
+
+    results.update({
+        "ols_summary": {
+            "params": params.to_dict(),
+            "rsquared": ols_model.rsquared,
+            "pvalues": pvalues.to_dict()
+        },
+        "intercept": params.get("const", np.nan),
+        "hedge_ratio": params.get("x", params.iloc[-1]),
+        "residual_adf": residual_adf,
+        "cointegrated": cointegrated,
+        "spread": residuals,
+        "y_aligned": y,
+        "x_aligned": x
+    })
+
+    if not cointegrated:
+        results["decision"] = "Residual is not stationary, so the pair is not cointegrated"
+        return results
+
+    ecm_model, ecm_df = estimate_ecm(y, x, residuals.shift(1))
+    results["ecm_summary"] = {
+        "params": ecm_model.params.to_dict(),
+        "pvalues": ecm_model.pvalues.to_dict(),
+        "rsquared": ecm_model.rsquared
+    }
+    results["ecm_data"] = ecm_df
+    results["decision"] = "Cointegrated"
+
+    return results
+
+
+# 滚动协整检验（252天窗口）
+# Rolling cointegration analysis
+def rolling_cointegration(
+    y_series,
+    x_series,
+    pair_name=None,
+    formation_window=252,
+    step=21,
+    regression="c",
+    max_diff=2,
+    return_details=False
+):
+    """
+    Run Engle-Granger cointegration tests over rolling formation windows.
+
+    Parameters
+    ----------
+    y_series, x_series : array-like or pandas Series
+        Price series for one pair.
+    pair_name : str, optional
+        Label used in the output table.
+    formation_window : int, default 252
+        Number of observations in each rolling formation window.
+    step : int, default 21
+        Number of observations to move forward after each window.
+    regression : str, default "c"
+        Regression setting passed to the ADF tests.
+    max_diff : int, default 2
+        Maximum differencing order used in integration-order checks.
+    return_details : bool, default False
+        If True, return both the summary table and full per-window results.
+
+    Returns
+    -------
+    pandas DataFrame
+        One row per rolling window. If return_details=True, returns
+        (summary_df, detailed_results).
+    """
+    if formation_window <= 0:
+        raise ValueError("formation_window must be positive")
+
+    if step <= 0:
+        raise ValueError("step must be positive")
+
+    df = pd.concat(
+        [
+            pd.Series(y_series).rename("y"),
+            pd.Series(x_series).rename("x")
+        ],
+        axis=1
+    ).dropna()
+
+    if not df.index.is_monotonic_increasing:
+        df = df.sort_index()
+
+    summary_rows = []
+    detailed_results = {}
+
+    for start in range(0, len(df) - formation_window + 1, step):
+        end = start + formation_window
+        window_df = df.iloc[start:end]
+        window_start = window_df.index[0]
+        window_end = window_df.index[-1]
+        window_label = f"{window_start}_{window_end}"
+
+        result = analyze_pair(
+            y_series=window_df["y"],
+            x_series=window_df["x"],
+            pair_name=pair_name,
+            regression=regression,
+            max_diff=max_diff
+        )
+
+        result["window_start"] = window_start
+        result["window_end"] = window_end
+        result["window_start_pos"] = start
+        result["window_end_pos"] = end - 1
+        detailed_results[window_label] = result
+
+        summary_rows.append({
+            "pair": pair_name,
+            "window_start": window_start,
+            "window_end": window_end,
+            "window_start_pos": start,
+            "window_end_pos": end - 1,
+            "n_obs": result.get("n_obs"),
+            "y_order": result.get("asset_y_integration", {}).get("order"),
+            "x_order": result.get("asset_x_integration", {}).get("order"),
+            "cointegrated": result.get("cointegrated", False),
+            "hedge_ratio": result.get("hedge_ratio"),
+            "intercept": result.get("intercept"),
+            "residual_adf_pvalue": result.get("residual_adf", {}).get("p_value"),
+            "ecm_coef": result.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
+            "ecm_pvalue": result.get("ecm_summary", {}).get("pvalues", {}).get("ect_lag"),
+            "decision": result.get("decision")
+        })
+
+    summary_df = pd.DataFrame(summary_rows)
+
+    if return_details:
+        return summary_df, detailed_results
+
+    return summary_df
+
 # Analyze all pairs
 def analyze_all_pairs(asset1_dict, asset2_dict, regression="c", max_diff=2):
     """
@@ -182,3 +342,4 @@ def summarize_results(results_dict):
         })
 
     return pd.DataFrame(rows)
+
