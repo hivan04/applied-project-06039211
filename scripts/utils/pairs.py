@@ -1,6 +1,6 @@
 # put libraries here
 
-from . import kalman
+from pykalman import KalmanFilter
 
 """
 Start by creating the simple hedge ratio first and save the results into .xslx or something

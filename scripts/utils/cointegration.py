@@ -1,8 +1,17 @@
 import pandas as pd
 import numpy as np
+import itertools
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.stattools import coint 
 
+"""
+HELPERS:
+- adf_test
+- determine_integration_order
+- run_ols
+- estimate_ecm
+"""
 
 # ADF test
 def adf_test(series, maxlag=None, regression="c", autolag="AIC"):
@@ -120,6 +129,7 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
         results["decision"] = "Insufficient observations after alignment"
         return results
 
+    # Integration order checks
     y_order_res = determine_integration_order(y, max_diff=max_diff, regression=regression)
     x_order_res = determine_integration_order(x, max_diff=max_diff, regression=regression)
 
@@ -130,6 +140,7 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
     results["asset_x_integration"] = x_order_res
     results["same_order_integration"] = (y_order == x_order)
 
+    # Standard Engle-Granger setup: both series should be I(1)
     if y_order is None or x_order is None:
         results["decision"] = "Integration order could not be determined"
         return results
@@ -138,9 +149,15 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
         results["decision"] = "Both series are not I(1), so standard Engle-Granger is not appropriate"
         return results
 
+    # OLS + cointegration tests
     ols_model, residuals = run_ols(y, x)
+    coint_stat, coint_pvalue, _ = coint(y, x)
+
     residual_adf = adf_test(residuals, regression=regression)
-    cointegrated = residual_adf["is_stationary_5pct"]
+    cointegrated = (
+        residual_adf["p_value"] < 0.05 and
+        coint_pvalue < 0.05
+    )
 
     params = ols_model.params
     pvalues = ols_model.pvalues
@@ -154,6 +171,7 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
         "intercept": params.get("const", np.nan),
         "hedge_ratio": params.get("x", params.iloc[-1]),
         "residual_adf": residual_adf,
+        "coint_test_pvalue": coint_pvalue,
         "cointegrated": cointegrated,
         "spread": residuals,
         "y_aligned": y,
@@ -164,6 +182,7 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
         results["decision"] = "Residual is not stationary, so the pair is not cointegrated"
         return results
 
+    # ECM
     ecm_model, ecm_df = estimate_ecm(y, x, residuals.shift(1))
     results["ecm_summary"] = {
         "params": ecm_model.params.to_dict(),
@@ -175,51 +194,18 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
 
     return results
 
-
 # 滚动协整检验（252天窗口）
 # Rolling cointegration analysis
-def rolling_cointegration(
-    y_series,
-    x_series,
-    pair_name=None,
-    formation_window=252,
-    step=21,
-    regression="c",
-    max_diff=2,
-    return_details=False
-):
+def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2):
     """
-    Run Engle-Granger cointegration tests over rolling formation windows.
-
-    Parameters
-    ----------
-    y_series, x_series : array-like or pandas Series
-        Price series for one pair.
-    pair_name : str, optional
-        Label used in the output table.
-    formation_window : int, default 252
-        Number of observations in each rolling formation window.
-    step : int, default 21
-        Number of observations to move forward after each window.
-    regression : str, default "c"
-        Regression setting passed to the ADF tests.
-    max_diff : int, default 2
-        Maximum differencing order used in integration-order checks.
-    return_details : bool, default False
-        If True, return both the summary table and full per-window results.
-
-    Returns
-    -------
-    pandas DataFrame
-        One row per rolling window. If return_details=True, returns
-        (summary_df, detailed_results).
+    Full workflow for one pair:
+    1. Align data
+    2. Check both series are I(1)
+    3. Run OLS
+    4. Test residual stationarity
+    5. Cross-check with coint()
+    6. Estimate ECM if cointegrated
     """
-    if formation_window <= 0:
-        raise ValueError("formation_window must be positive")
-
-    if step <= 0:
-        raise ValueError("step must be positive")
-
     df = pd.concat(
         [
             pd.Series(y_series).rename("y"),
@@ -228,101 +214,99 @@ def rolling_cointegration(
         axis=1
     ).dropna()
 
-    if not df.index.is_monotonic_increasing:
-        df = df.sort_index()
+    y = df["y"]
+    x = df["x"]
 
-    summary_rows = []
-    detailed_results = {}
+    results = {
+        "pair_name": pair_name,
+        "n_obs": len(df),
+        "cointegrated": False
+    }
 
-    for start in range(0, len(df) - formation_window + 1, step):
-        end = start + formation_window
-        window_df = df.iloc[start:end]
-        window_start = window_df.index[0]
-        window_end = window_df.index[-1]
-        window_label = f"{window_start}_{window_end}"
+    if len(df) < 20:
+        results["decision"] = "Insufficient observations after alignment"
+        return results
 
-        result = analyze_pair(
-            y_series=window_df["y"],
-            x_series=window_df["x"],
-            pair_name=pair_name,
-            regression=regression,
-            max_diff=max_diff
-        )
+    # Integration order checks
+    y_order_res = determine_integration_order(y, max_diff=max_diff, regression=regression)
+    x_order_res = determine_integration_order(x, max_diff=max_diff, regression=regression)
 
-        result["window_start"] = window_start
-        result["window_end"] = window_end
-        result["window_start_pos"] = start
-        result["window_end_pos"] = end - 1
-        detailed_results[window_label] = result
+    y_order = y_order_res["order"]
+    x_order = x_order_res["order"]
 
-        summary_rows.append({
-            "pair": pair_name,
-            "window_start": window_start,
-            "window_end": window_end,
-            "window_start_pos": start,
-            "window_end_pos": end - 1,
-            "n_obs": result.get("n_obs"),
-            "y_order": result.get("asset_y_integration", {}).get("order"),
-            "x_order": result.get("asset_x_integration", {}).get("order"),
-            "cointegrated": result.get("cointegrated", False),
-            "hedge_ratio": result.get("hedge_ratio"),
-            "intercept": result.get("intercept"),
-            "residual_adf_pvalue": result.get("residual_adf", {}).get("p_value"),
-            "ecm_coef": result.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
-            "ecm_pvalue": result.get("ecm_summary", {}).get("pvalues", {}).get("ect_lag"),
-            "decision": result.get("decision")
-        })
+    results["asset_y_integration"] = y_order_res
+    results["asset_x_integration"] = x_order_res
+    results["same_order_integration"] = (y_order == x_order)
 
-    summary_df = pd.DataFrame(summary_rows)
+    # Standard Engle-Granger setup: both series should be I(1)
+    if y_order is None or x_order is None:
+        results["decision"] = "Integration order could not be determined"
+        return results
 
-    if return_details:
-        return summary_df, detailed_results
+    if y_order != 1 or x_order != 1:
+        results["decision"] = "Both series are not I(1), so standard Engle-Granger is not appropriate"
+        return results
 
-    return summary_df
+    # Run OLS in levels
+    ols_model, residuals = run_ols(y, x)
 
-# Analyze all pairs
-def analyze_all_pairs(asset1_dict, asset2_dict, regression="c", max_diff=2):
-    """
-    Run the full workflow for all common keys in the two dictionaries.
-    """
-    common_keys = sorted(set(asset1_dict).intersection(asset2_dict))
-    all_results = {}
+    hedge_ratio = ols_model.params.get("x", np.nan)
+    intercept = ols_model.params.get("const", np.nan)
 
-    for key in common_keys:
-        all_results[key] = analyze_pair(
-            y_series=asset1_dict[key],
-            x_series=asset2_dict[key],
-            pair_name=key,
-            regression=regression,
-            max_diff=max_diff
-        )
+    results["ols_summary"] = {
+        "params": ols_model.params.to_dict(),
+        "pvalues": ols_model.pvalues.to_dict(),
+        "rsquared": ols_model.rsquared
+    }
 
-    return all_results
+    # Store OLS outputs
+    results["hedge_ratio"] = hedge_ratio
+    results["intercept"] = intercept
+    results["spread"] = residuals
+    results["y_aligned"] = y
+    results["x_aligned"] = x
 
-# Extract cointegrated pairs for trading
-def extract_trading_pairs(results_dict):
-    """
-    Extract only cointegrated pairs using stored results.
-    No re-estimation is performed.
-    """
-    trading_pairs = {}
+    # Residual stationarity test (Engle-Granger step 2)
+    resid_adf = adf_test(residuals, regression=regression)
+    results["residual_adf"] = resid_adf
 
-    for pair, res in results_dict.items():
-        if not res.get("cointegrated", False):
-            continue
-
-        trading_pairs[pair] = {
-            "hedge_ratio": res.get("hedge_ratio"),
-            "intercept": res.get("intercept"),
-            "spread": res.get("spread"),
-            "y": res.get("y_aligned"),
-            "x": res.get("x_aligned"),
-            "ecm_coef": res.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
-            "ecm_pvalue": res.get("ecm_summary", {}).get("pvalues", {}).get("ect_lag"),
-            "residual_adf_pvalue": res.get("residual_adf", {}).get("p_value")
+    # Built-in cointegration test cross-check
+    coint_stat, coint_pvalue, coint_crit = coint(y, x)
+    results["coint_test"] = {
+        "test_stat": coint_stat,
+        "p_value": coint_pvalue,
+        "critical_values": {
+            "1%": coint_crit[0],
+            "5%": coint_crit[1],
+            "10%": coint_crit[2]
         }
+    }
+    results["coint_test_pvalue"] = coint_pvalue
 
-    return trading_pairs
+    # Require both tests to pass
+    cointegrated = (
+        resid_adf["is_stationary_5pct"] and
+        coint_pvalue < 0.05
+    )
+
+    if not cointegrated:
+        results["decision"] = "Residual is not stationary or coint() does not confirm cointegration"
+        return results
+
+    # ECM
+    ecm_model, ecm_df = estimate_ecm(y, x, residuals.shift(1))
+    results["ecm_summary"] = {
+        "params": ecm_model.params.to_dict(),
+        "pvalues": ecm_model.pvalues.to_dict(),
+        "rsquared": ecm_model.rsquared
+    }
+    results["ecm_data"] = ecm_df
+
+    # Cointegration accepted
+    results["cointegrated"] = True
+    results["decision"] = "Cointegration"
+
+    return results
 
 # Summary table
 def summarize_results(results_dict):
@@ -330,16 +314,17 @@ def summarize_results(results_dict):
 
     for pair, res in results_dict.items():
         rows.append({
-            "pair": pair,
-            "n_obs": res.get("n_obs"),
-            "y_order": res.get("asset_y_integration", {}).get("order"),
-            "x_order": res.get("asset_x_integration", {}).get("order"),
-            "cointegrated": res.get("cointegrated", False),
-            "hedge_ratio": res.get("hedge_ratio"),
-            "residual_adf_pvalue": res.get("residual_adf", {}).get("p_value"),
-            "ecm_coef": res.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
-            "decision": res.get("decision")
-        })
+        "pair": pair,
+        "n_obs": res.get("n_obs"),
+        "y_order": res.get("asset_y_integration", {}).get("order"),
+        "x_order": res.get("asset_x_integration", {}).get("order"),
+        "cointegrated": res.get("cointegrated", False),
+        "hedge_ratio": res.get("hedge_ratio"),
+        "residual_adf_pvalue": res.get("residual_adf", {}).get("p_value"),
+        "coint_test_pvalue": res.get("coint_test_pvalue"),
+        "ecm_coef": res.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
+        "decision": res.get("decision")
+    })
 
     return pd.DataFrame(rows)
 
