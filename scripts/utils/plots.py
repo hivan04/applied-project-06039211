@@ -70,6 +70,29 @@ def compute_zscore(series, window=None):
     return zscore
 
 # Plots
+def plot_multiple_price_pairs(df, pairs, figsize=(10, 12)):
+    """
+    Plot multiple already-transformed price pairs stacked vertically.
+    """
+    n = len(pairs)
+    fig, axes = plt.subplots(n, 1, figsize=figsize, sharex=True)
+
+    if n == 1:
+        axes = [axes]
+
+    for ax, (y, x) in zip(axes, pairs):
+        sns.lineplot(ax=ax, x=df.index, y=df[y], label=y)
+        sns.lineplot(ax=ax, x=df.index, y=df[x], label=x)
+
+        ax.set_title(f"{y} vs {x}")
+        ax.set_ylabel("Log Price")
+        ax.grid(True)
+        ax.legend()
+
+    axes[-1].set_xlabel("Date")
+    plt.tight_layout()
+    plt.show()
+
 def plot_multiple_spreads(spread_dict, figsize=(10, 12)):
     """
     Plot multiple spread time series stacked vertically.
