@@ -43,7 +43,7 @@ def estimate_hedge_ratio_df(y, x, pair_name=None, add_intercept=True):
     summary_df = pd.DataFrame([{
         "pair": pair_name,
         "alpha": alpha,
-        "beta (Δ Ratio)": beta,
+        "beta": beta,
         "r_squared": model.rsquared,
         "n_obs": int(model.nobs)
     }])
