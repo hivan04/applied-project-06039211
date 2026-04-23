@@ -196,7 +196,7 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
 
 # 滚动协整检验（252天窗口）
 # Rolling cointegration analysis
-def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2):
+def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2):
     """
     Full workflow for one pair:
     1. Align data
@@ -328,3 +328,21 @@ def summarize_results(results_dict):
 
     return pd.DataFrame(rows)
 
+def summarize_results_list(results_list):
+    rows = []
+
+    for res in results_list:
+        rows.append({
+            "pair": res.get("pair_name"),
+            "n_obs": res.get("n_obs"),
+            "y_order": res.get("asset_y_integration", {}).get("order"),
+            "x_order": res.get("asset_x_integration", {}).get("order"),
+            "cointegrated": res.get("cointegrated", False),
+            "hedge_ratio": res.get("hedge_ratio"),
+            "residual_adf_pvalue": res.get("residual_adf", {}).get("p_value"),
+            "coint_test_pvalue": res.get("coint_test_pvalue"),
+            "ecm_coef": res.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
+            "decision": res.get("decision")
+        })
+
+    return pd.DataFrame(rows)
