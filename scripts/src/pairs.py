@@ -3,8 +3,7 @@ import pandas as pd
 from pykalman import KalmanFilter
 import statsmodels.api as sm
 
-from src.kalman import *
-# from kalman import *
+from .kalman import *
 
 MAX_R = 10
 
