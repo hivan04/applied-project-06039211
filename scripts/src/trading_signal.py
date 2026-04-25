@@ -5,12 +5,18 @@ import statsmodels.api as sm
 
 def generate_kalman_signals(dynamic_details, entry_z=2.0, exit_z=0.5):
     """
-    For each (pair, R) in dynamic_details:
-    - compute spread_t
-    - standardise into z-score
-    - generate trading signals
+    Generate trading signals using z-score thresholds with proper position holding.
 
-    Returns:
+    Parameters
+    ----------
+    dynamic_details : dict
+        {(pair_name, R): DataFrame with columns y, x, alpha_t, beta_t}
+    entry_z : float
+        Entry threshold for z-score
+    exit_z : float
+        Exit threshold for z-score
+
+    Returns
     -------
     signals_dict : dict
         {(pair_name, R): DataFrame with spread, zscore, position}
@@ -21,28 +27,32 @@ def generate_kalman_signals(dynamic_details, entry_z=2.0, exit_z=0.5):
     for key, data in dynamic_details.items():
         df = data.copy()
 
-        # 1. Compute spread (already done, but safe to recompute)
+        # 1. Compute spread
         df["spread_t"] = df["y"] - df["alpha_t"] - df["beta_t"] * df["x"]
 
-        # 2. Standardise (z-score)
-        df["zscore"] = (
-            df["spread_t"] - df["spread_t"].mean()
-        ) / df["spread_t"].std()
+        # 2. Compute z-score
+        df["rolling_mean"] = df["spread_t"].rolling(60).mean()
+        df["rolling_std"] = df["spread_t"].rolling(60).std()
+        
+        df["zscore"] = (df["spread_t"] - df["rolling_mean"]) / df["rolling_std"]
+        df = df.dropna()
 
-        # 3. Generate signals
-        df["position"] = 0
+        # 3. Initialise with NaN (IMPORTANT)
+        df["position"] = np.nan
 
-        # Entry signals
+        # 4. Entry signals
         df.loc[df["zscore"] > entry_z, "position"] = -1   # short spread
         df.loc[df["zscore"] < -entry_z, "position"] = 1   # long spread
 
-        # Exit signals
+        # 5. Exit signals
         df.loc[df["zscore"].abs() < exit_z, "position"] = 0
 
-        # Forward fill positions
-        df["position"] = df["position"].ffill()
+        # 6. Forward-fill positions and replace initial NaNs with 0
+        df["position"] = df["position"].ffill().fillna(0)
 
         # Store result
         signals_dict[key] = df
 
     return signals_dict
+
+
