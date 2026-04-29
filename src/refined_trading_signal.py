@@ -4,6 +4,8 @@ from pykalman import KalmanFilter
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
+# DO VOLATILITY ANALYSIS TO DETERMINE AN APPROPRIATE DRAWDOWN %
+
 def generate_refined_kalman_signals(
     dynamic_details,
     z_window=60,
@@ -249,3 +251,264 @@ def plot_refined_trade_signals(signals_df, pair_name, obs_cov=None, figsize=(14,
     axes[1].legend(loc="best")
 
     plt.tight_layout()
+
+def refined_performance_metrics(
+    results_dict,
+    rf=None,
+    initial_capital=1.0,
+    annualisation_factor=252
+):
+    performance_rows = []
+
+    def iter_result_frames(results_obj):
+        """
+        Normalise supported refined-result containers into a common iterator of
+        (strategy_key, pair_name, obs_cov, df).
+
+        Supported inputs
+        ----------------
+        1. DataFrame returned by generate_refined_kalman_signals
+        2. Flat dict: {(pair_name, obs_cov): df}
+        3. Nested dict: {strategy_key: {(pair_name, obs_cov): df}}
+        """
+        if isinstance(results_obj, pd.DataFrame):
+            if not {"pair", "obs_cov"}.issubset(results_obj.columns):
+                raise ValueError(
+                    "Refined results DataFrame must contain 'pair' and 'obs_cov' columns."
+                )
+
+            strategy_key = (
+                results_obj["strategy"].iloc[0]
+                if "strategy" in results_obj.columns
+                else "refined_dynamic_bands"
+            )
+
+            for (pair_name, obs_cov), df in results_obj.groupby(["pair", "obs_cov"]):
+                yield strategy_key, pair_name, obs_cov, df.copy()
+            return
+
+        if not isinstance(results_obj, dict):
+            raise TypeError(
+                "results_dict must be a DataFrame, a flat dict, or a nested dict of DataFrames."
+            )
+
+        if not results_obj:
+            return
+
+        first_key = next(iter(results_obj))
+        first_value = results_obj[first_key]
+
+        if (
+            isinstance(first_key, tuple)
+            and len(first_key) == 2
+            and isinstance(first_value, pd.DataFrame)
+        ):
+            for (pair_name, obs_cov), df in results_obj.items():
+                yield "refined_dynamic_bands", pair_name, obs_cov, df.copy()
+            return
+
+        for strategy_key, signals_dict in results_obj.items():
+            if isinstance(signals_dict, pd.DataFrame):
+                if not {"pair", "obs_cov"}.issubset(signals_dict.columns):
+                    raise ValueError(
+                        "Nested refined results DataFrame must contain 'pair' and 'obs_cov' columns."
+                    )
+
+                for (pair_name, obs_cov), df in signals_dict.groupby(["pair", "obs_cov"]):
+                    yield strategy_key, pair_name, obs_cov, df.copy()
+                continue
+
+            if not isinstance(signals_dict, dict):
+                raise TypeError(
+                    "Nested refined results must map strategy names to dicts or DataFrames."
+                )
+
+            for (pair_name, obs_cov), df in signals_dict.items():
+                yield strategy_key, pair_name, obs_cov, df.copy()
+
+    # Prepare risk-free rate if provided
+    if rf is not None:
+        rf = rf.copy()
+
+        # If date/Date is a column, set it as the index
+        if "Date" in rf.columns:
+            rf["Date"] = pd.to_datetime(rf["Date"])
+            rf = rf.set_index("Date")
+        elif "date" in rf.columns:
+            rf["date"] = pd.to_datetime(rf["date"])
+            rf = rf.set_index("date")
+
+        rf = rf.sort_index()
+
+        # Use the first column as the RF series
+        if isinstance(rf, pd.DataFrame):
+            rf_series = rf.iloc[:, 0]
+        else:
+            rf_series = rf
+
+        rf_series = rf_series.astype(float)
+
+    for strategy_key, pair_name, R, df in iter_result_frames(results_dict):
+
+        # Ensure Date is available and correctly formatted
+        if "Date" not in df.columns:
+            df = df.reset_index()
+
+        if "date" in df.columns and "Date" not in df.columns:
+            df = df.rename(columns={"date": "Date"})
+
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values("Date")
+        df = df.set_index("Date", drop=False)
+
+        # Calculate refined strategy returns if needed
+        if "strategy_return" not in df.columns:
+
+            df["spread_change"] = df["spread_t"].diff()
+
+            # Lag position to avoid look-ahead bias
+            df["lagged_position"] = df["position"].shift(1)
+
+            df["strategy_pnl"] = (
+                df["lagged_position"] * df["spread_change"]
+            )
+
+            df["strategy_pnl"] = df["strategy_pnl"].fillna(0)
+
+            df["strategy_return"] = (
+                df["strategy_pnl"] / initial_capital
+            )
+
+        else:
+            # Keep this available for later metrics
+            if "strategy_pnl" not in df.columns:
+                df["strategy_pnl"] = df["strategy_return"] * initial_capital
+
+            if "lagged_position" not in df.columns:
+                df["lagged_position"] = df["position"].shift(1)
+
+        strategy_returns = df["strategy_return"].dropna()
+
+        if len(strategy_returns) == 0:
+            continue
+
+        # Risk-free adjustment
+        if rf is not None:
+            rf_aligned = rf_series.reindex(strategy_returns.index).ffill()
+
+            # Drop observations where RF is still missing
+            valid_idx = rf_aligned.dropna().index
+
+            strategy_returns = strategy_returns.loc[valid_idx]
+            rf_aligned = rf_aligned.loc[valid_idx]
+
+            excess_returns = strategy_returns - rf_aligned
+        else:
+            excess_returns = strategy_returns
+
+        if len(excess_returns) == 0:
+            continue
+
+        # Core return metrics
+        avg_return = strategy_returns.mean() * 100
+        avg_excess_return = excess_returns.mean() * 100
+
+        total_pnl = df.loc[strategy_returns.index, "strategy_pnl"].sum()
+        total_return = total_pnl / initial_capital
+
+        annualised_return = excess_returns.mean() * annualisation_factor
+        annualised_volatility = excess_returns.std() * np.sqrt(annualisation_factor)
+
+        # Sharpe calculated using decimal excess returns
+        std_excess_return = excess_returns.std()
+
+        sharpe = (
+            excess_returns.mean() / std_excess_return
+            if std_excess_return != 0
+            else np.nan
+        )
+
+        annualised_sharpe = (
+            sharpe * np.sqrt(annualisation_factor)
+            if not np.isnan(sharpe)
+            else np.nan
+        )
+
+        # Additional refined metrics
+        hit_rate = (strategy_returns > 0).mean() * 100
+
+        num_trades = df["position"].diff().abs().sum() / 2
+
+        average_pnl = df.loc[strategy_returns.index, "strategy_pnl"].mean()
+
+        if "trade_drawdown" in df.columns:
+            max_trade_drawdown = df["trade_drawdown"].min()
+        else:
+            max_trade_drawdown = np.nan
+
+        n_obs = len(strategy_returns)
+
+        n_active_days = (
+            df.loc[strategy_returns.index, "lagged_position"]
+            .abs()
+            .gt(0)
+            .sum()
+        )
+
+        active_day_ratio = (
+            n_active_days / n_obs * 100
+            if n_obs > 0
+            else np.nan
+        )
+
+        # Extract strategy parameters
+        try:
+            entry_z = float(strategy_key.split("_")[1])
+        except Exception:
+            entry_z = np.nan
+
+        try:
+            exit_z = float(strategy_key.split("_")[3])
+        except Exception:
+            exit_z = df["exit_z"].iloc[0] if "exit_z" in df.columns else np.nan
+
+        # Optional parameters from df if available
+        z_window = df["z_window"].iloc[0] if "z_window" in df.columns else np.nan
+        band_window = df["band_window"].iloc[0] if "band_window" in df.columns else np.nan
+        upper_quantile = df["upper_quantile"].iloc[0] if "upper_quantile" in df.columns else np.nan
+        lower_quantile = df["lower_quantile"].iloc[0] if "lower_quantile" in df.columns else np.nan
+
+        performance_rows.append({
+            "strategy": strategy_key,
+            "pair": pair_name,
+            "obs_cov": R,
+
+            "entry_z": entry_z,
+            "exit_z": exit_z,
+            "z_window": z_window,
+            "band_window": band_window,
+            "upper_quantile": upper_quantile,
+            "lower_quantile": lower_quantile,
+
+            "average_pnl": average_pnl,
+            "total_pnl": total_pnl,
+
+            "avg_return (%)": avg_return,
+            "avg_excess_return (%)": avg_excess_return,
+            "total_return (%)": total_return * 100,
+            "annualised_return (%)": annualised_return * 100,
+            "annualised_volatility (%)": annualised_volatility * 100,
+
+            "sharpe": sharpe,
+            "annualised_sharpe": annualised_sharpe,
+
+            "hit_rate (%)": hit_rate,
+            "num_trades": num_trades,
+            "max_trade_drawdown": max_trade_drawdown,
+
+            "n_obs": n_obs,
+            "n_active_days": n_active_days,
+            "active_day_ratio (%)": active_day_ratio
+        })
+
+    return pd.DataFrame(performance_rows)

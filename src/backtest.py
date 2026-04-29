@@ -98,6 +98,25 @@ def plot_trade_signals(results_dict, strategy_name, pair_name, obs_cov=None, fig
 def performance_metrics(results_dict, rf=None, annualisation_factor=252):
     performance_rows = []
 
+    # Prepare risk-free rate if provided
+    if rf is not None:
+        rf = rf.copy()
+
+        # If date is a column, set it as the index
+        if "date" in rf.columns:
+            rf["date"] = pd.to_datetime(rf["date"])
+            rf = rf.set_index("date")
+
+        rf = rf.sort_index()
+
+        # Use the first column as the RF series
+        if isinstance(rf, pd.DataFrame):
+            rf_series = rf.iloc[:, 0]
+        else:
+            rf_series = rf
+
+        rf_series = rf_series.astype(float)
+
     for strategy_key, signals_dict in results_dict.items():
 
         for (pair_name, R), df in signals_dict.items():
@@ -112,25 +131,48 @@ def performance_metrics(results_dict, rf=None, annualisation_factor=252):
             if len(strategy_returns) == 0:
                 continue
 
-            # Risk-free adjustment
+            # Align risk-free rate to strategy returns
             if rf is not None:
-                rf_aligned = rf.reindex(strategy_returns.index).ffill().iloc[:, 0]
-                excess_returns = strategy_returns - rf_aligned
+                rf_aligned = rf_series.reindex(strategy_returns.index).ffill()
 
+                # Drop observations where RF is still missing
+                valid_idx = rf_aligned.dropna().index
+                strategy_returns = strategy_returns.loc[valid_idx]
+                rf_aligned = rf_aligned.loc[valid_idx]
+
+                excess_returns = strategy_returns - rf_aligned
             else:
                 excess_returns = strategy_returns
 
-            avg_return = (strategy_returns.mean())*100
-            avg_excess_return = (excess_returns.mean())*100
+            if len(excess_returns) == 0:
+                continue
 
+            # Display returns in percentage terms
+            avg_return = strategy_returns.mean() * 100
+            avg_excess_return = excess_returns.mean() * 100
+
+            # Total cumulative strategy return/pnl in raw decimal units
             total_pnl = strategy_returns.sum()
 
-            std_return = strategy_returns.std()
+            # Sharpe should be calculated using decimal returns, not percentage returns
+            std_excess_return = excess_returns.std()
 
-            sharpe = avg_excess_return / std_return if std_return != 0 else np.nan
-            annualised_sharpe = sharpe * np.sqrt(annualisation_factor) if not np.isnan(sharpe) else np.nan
+            sharpe = (
+                excess_returns.mean() / std_excess_return
+                if std_excess_return != 0
+                else np.nan
+            )
 
-            hit_rate = ((strategy_returns > 0).mean())*100
+            annualised_sharpe = (
+                sharpe * np.sqrt(annualisation_factor)
+                if not np.isnan(sharpe)
+                else np.nan
+            )
+
+            # Hit rate based on daily positive strategy returns
+            hit_rate = (strategy_returns > 0).mean() * 100
+
+            # Approximate number of round-trip trades
             num_trades = df["position"].diff().abs().sum() / 2
 
             performance_rows.append({
