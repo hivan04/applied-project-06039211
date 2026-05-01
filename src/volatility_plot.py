@@ -1,11 +1,12 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from local_config import *
 
 
 def pair_volatility_plots(
     vol_df,
-    output_dir="/Users/ivanhung/Documents/GitHub/applied-project-06039211/outputs/volatility",
+    output_dir=PROJECT_ROOT / "outputs/volatility",
     vol_col="pair_strategy_vol",
     date_col="date",
     figsize=(12, 5)

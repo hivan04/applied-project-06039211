@@ -1,7 +1,8 @@
 import pandas as pd 
+from local_config import *
 
 # Load in data
-df = pd.read_csv("/Users/ivanhung/Documents/GitHub/applied-project-06039211/data/raw_data/DTB3_RF.csv")
+df = pd.read_csv(PROJECT_ROOT / "data/raw_data/DTB3_RF.csv")
 
 # Rename columns
 df = df.rename(columns={
@@ -38,13 +39,13 @@ df = df.loc[start_date:end_date]
 df["rf"] = (1+ df["rf"] / 100) ** (1 / 252) -1
 
 # Load in df1 dataframes for is/oos date splits
-df1_is = pd.read_csv("/Users/ivanhung/Documents/GitHub/applied-project-06039211/data/df1_is",
+df1_is = pd.read_csv(PROJECT_ROOT / "data/df1_is",
                      index_col=0, parse_dates=True)
-df1_oos = pd.read_csv("/Users/ivanhung/Documents/GitHub/applied-project-06039211/data/df1_oos",
+df1_oos = pd.read_csv(PROJECT_ROOT / "data/df1_oos",
                       index_col=0, parse_dates=True)
 
 rf_is = df.loc[df1_is.index.min():df1_is.index.max()]
 rf_oos = df.loc[df1_oos.index.min():df1_oos.index.max()]
 
-rf_is.to_csv("/Users/ivanhung/Documents/GitHub/applied-project-06039211/data/rf_is")
-rf_oos.to_csv("/Users/ivanhung/Documents/GitHub/applied-project-06039211/data/rf_oos")
+rf_is.to_csv(PROJECT_ROOT / "data/rf_is")
+rf_oos.to_csv(PROJECT_ROOT / "data/rf_oos")
