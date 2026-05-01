@@ -2,3 +2,4 @@ misc/
 data/
 .DS_Store
 .gitignore.DS_Store
+local_config.py

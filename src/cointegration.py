@@ -7,10 +7,10 @@ from statsmodels.tsa.stattools import coint
 
 """
 HELPERS:
-- adf_test
-- determine_integration_order
-- run_ols
-- estimate_ecm
+- adf_test - stationarity test
+- determine_integration_order - first diagnostic for cointegration prescence 
+- run_ols - part i of engle granger test
+- estimate_ecm - regression on error term if cointegration found
 """
 
 # ADF test

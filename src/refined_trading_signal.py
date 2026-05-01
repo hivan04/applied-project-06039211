@@ -3,8 +3,20 @@ import pandas as pd
 from pykalman import KalmanFilter
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
+import os
 
-# DO VOLATILITY ANALYSIS TO DETERMINE AN APPROPRIATE DRAWDOWN %
+"""
+Contents:
+1) generate_refined_kalman_signals - generates refined signals (including dynamic z-score thresholds 
+   and drawdowns that have been calculated to each pair based off the pairs volatility)
+2) plot_refined_trade_signals - plots the refined trading singals 
+3) plot_refined_trade_signals_risk - plots only the risk trading signals (reduced exposure 
+   and closed by drawdown)
+4) plots_loop - for loop functin to save all the combination of pairs with different R values 
+   (R = how much the filter trusts the new observed data point relative to the model’s prior estimate)
+5) refined_performance_metrics - calculates the performance metrics for our strategies
+6) iter_result_frames - format function that helps to store data values consistently throughout dataframe
+"""
 
 def generate_refined_kalman_signals(
     dynamic_details,
@@ -13,22 +25,51 @@ def generate_refined_kalman_signals(
     upper_quantile=0.90,
     lower_quantile=0.10,
     exit_z=0.5,
-    reduce_dd=-0.10,
-    close_dd=-1.00,
+    drawdown_thresholds=None,
     reduced_exposure=0.5,
     shift_bands=True
 ):
     """
     Generate refined Kalman trading signals using dynamic rolling z-score bands
-    and a drawdown-based risk management overlay.
+    and a volatility-scaled drawdown-based risk management overlay.
+
+    Parameters
+    ----------
+    dynamic_details : dict
+        Dictionary where keys are (pair_name, obs_cov) and values are DataFrames.
+
+    drawdown_thresholds : pd.DataFrame, optional
+        DataFrame containing:
+        - date
+        - pair
+        - obs_cov
+        - reduce_drawdown_threshold
+        - close_drawdown_threshold
 
     Returns
     -------
-    signals_df : DataFrame
+    signals_df : pd.DataFrame
         Combined DataFrame containing refined signals for all pairs and R values.
     """
 
     all_results = []
+
+    # Prepare threshold DataFrame once
+    if drawdown_thresholds is not None:
+        threshold_df = drawdown_thresholds.copy()
+        threshold_df["date"] = pd.to_datetime(threshold_df["date"])
+
+        threshold_df = threshold_df[
+            [
+                "date",
+                "pair",
+                "obs_cov",
+                "reduce_drawdown_threshold",
+                "close_drawdown_threshold"
+            ]
+        ].copy()
+    else:
+        threshold_df = None
 
     for key, data in dynamic_details.items():
         pair_name, obs_cov = key
@@ -54,6 +95,31 @@ def generate_refined_kalman_signals(
 
         df = df.dropna().copy()
 
+        # Add identifiers before merging thresholds
+        df["pair"] = pair_name
+        df["obs_cov"] = obs_cov
+
+        # Create date column for merging
+        df = df.reset_index()
+
+        if "Date" in df.columns:
+            df = df.rename(columns={"Date": "date"})
+        elif "index" in df.columns:
+            df = df.rename(columns={"index": "date"})
+
+        df["date"] = pd.to_datetime(df["date"])
+
+        # Merge dynamic drawdown thresholds
+        if threshold_df is not None:
+            df = df.merge(
+                threshold_df,
+                on=["date", "pair", "obs_cov"],
+                how="left"
+            )
+        else:
+            df["reduce_drawdown_threshold"] = np.nan
+            df["close_drawdown_threshold"] = np.nan
+
         # 4. Generate raw trading signal from dynamic bands
         df["raw_position"] = np.nan
 
@@ -66,7 +132,6 @@ def generate_refined_kalman_signals(
         # 5. Drawdown-based position overlay
         df["spread_change"] = df["spread_t"].diff()
 
-        # Create lists for each of the indicators to assist with determining what the signal should do
         position = []
         trade_pnl = []
         trade_equity = []
@@ -84,6 +149,9 @@ def generate_refined_kalman_signals(
 
             raw_pos = row["raw_position"]
             spread_now = row["spread_t"]
+
+            reduce_dd_t = row["reduce_drawdown_threshold"]
+            close_dd_t = row["close_drawdown_threshold"]
 
             if previous_spread is None:
                 pnl = 0.0
@@ -119,11 +187,12 @@ def generate_refined_kalman_signals(
 
                 dd = current_trade_equity - current_peak
 
-                if dd <= close_dd:
+                # Thresholds are positive values, while drawdown is negative.
+                if pd.notna(close_dd_t) and dd <= -close_dd_t:
                     current_position = 0.0
                     state = "closed_by_drawdown"
 
-                elif dd <= reduce_dd:
+                elif pd.notna(reduce_dd_t) and dd <= -reduce_dd_t:
                     current_position = reduced_exposure * raw_pos
                     state = "reduced_by_drawdown"
 
@@ -145,17 +214,16 @@ def generate_refined_kalman_signals(
         df["trade_drawdown"] = drawdown
         df["risk_state"] = risk_state
 
-        # 6. Add identifiers so everything is stored in one DataFrame
-        df["pair"] = pair_name
-        df["obs_cov"] = obs_cov
+        # 6. Add model parameters
         df["z_window"] = z_window
         df["band_window"] = band_window
         df["upper_quantile"] = upper_quantile
         df["lower_quantile"] = lower_quantile
         df["exit_z"] = exit_z
-        df["reduce_dd"] = reduce_dd
-        df["close_dd"] = close_dd
         df["reduced_exposure"] = reduced_exposure
+
+        # Set date back as index if you prefer
+        df = df.set_index("date")
 
         all_results.append(df)
 
@@ -251,6 +319,181 @@ def plot_refined_trade_signals(signals_df, pair_name, obs_cov=None, figsize=(14,
     axes[1].legend(loc="best")
 
     plt.tight_layout()
+
+def plot_refined_trade_signals_risk(signals_df, pair_name, obs_cov=None, figsize=(14, 9)):
+    """
+    Visualise drawdown-based risk management events for one pair.
+
+    Parameters
+    ----------
+    signals_df : DataFrame
+        Output of generate_refined_kalman_signals.
+    pair_name : str
+        Pair label to plot.
+    obs_cov : float, optional
+        Observation covariance R. If omitted, the first matching value is used.
+    """
+    pair_df = signals_df.loc[signals_df["pair"] == pair_name].copy()
+
+    if pair_df.empty:
+        raise KeyError(f"Pair '{pair_name}' was not found in the refined signals DataFrame.")
+
+    available_r = sorted(pair_df["obs_cov"].unique().tolist())
+
+    if obs_cov is None:
+        selected_obs_cov = available_r[0]
+    else:
+        selected_obs_cov = None
+        for candidate in available_r:
+            if np.isclose(float(candidate), float(obs_cov)):
+                selected_obs_cov = candidate
+                break
+
+        if selected_obs_cov is None:
+            raise KeyError(f"obs_cov={obs_cov} was not found. Available values: {available_r}")
+
+    df = pair_df.loc[pair_df["obs_cov"] == selected_obs_cov].copy().sort_index()
+
+    reduced = df["risk_state"] == "reduced_by_drawdown"
+    forced_closes = df["risk_state"] == "closed_by_drawdown"
+
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=figsize,
+        sharex=True,
+        gridspec_kw={"height_ratios": [2, 1]}
+    )
+
+    # -------------------
+    # Top panel: spread
+    # -------------------
+    axes[0].plot(df.index, df["spread_t"], color="steelblue", lw=1.4, label="Spread")
+
+    if reduced.any():
+        axes[0].scatter(
+            df.index[reduced],
+            df.loc[reduced, "spread_t"],
+            color="darkorange",
+            marker="o",
+            s=45,
+            label="Reduced Exposure"
+        )
+
+    if forced_closes.any():
+        axes[0].scatter(
+            df.index[forced_closes],
+            df.loc[forced_closes, "spread_t"],
+            color="purple",
+            marker="D",
+            s=40,
+            label="Closed by Drawdown"
+        )
+
+    axes[0].axhline(0, color="grey", linestyle="--", lw=1)
+    axes[0].set_title(f"Risk Management Overlay for {pair_name} | R={selected_obs_cov}")
+    axes[0].set_ylabel("Spread")
+    axes[0].legend(loc="best")
+
+    # -------------------
+    # Bottom panel: z-score
+    # -------------------
+    axes[1].plot(df.index, df["zscore"], color="darkorange", lw=1.2, label="Z-score")
+    axes[1].plot(df.index, df["upper_band"], color="firebrick", linestyle="--", lw=1, label="Upper Entry Band")
+    axes[1].plot(df.index, df["lower_band"], color="seagreen", linestyle="--", lw=1, label="Lower Entry Band")
+
+    if reduced.any():
+        axes[1].scatter(
+            df.index[reduced],
+            df.loc[reduced, "zscore"],
+            color="darkorange",
+            marker="o",
+            s=35,
+            label="Reduced Exposure"
+        )
+
+    if forced_closes.any():
+        axes[1].scatter(
+            df.index[forced_closes],
+            df.loc[forced_closes, "zscore"],
+            color="purple",
+            marker="D",
+            s=35,
+            label="Closed by Drawdown"
+        )
+
+    exit_z = float(df["exit_z"].iloc[0])
+    axes[1].axhline(exit_z, color="grey", linestyle=":", lw=1, label=f"Exit +{exit_z}")
+    axes[1].axhline(-exit_z, color="grey", linestyle=":", lw=1, label=f"Exit -{exit_z}")
+    axes[1].axhline(0, color="black", linestyle="-", lw=0.8)
+
+    axes[1].set_ylabel("Z-score")
+    axes[1].set_xlabel("Date")
+    axes[1].legend(loc="best")
+
+    plt.tight_layout()
+
+def plots_loop(
+    signals_df,
+    save_dir,
+    plot_func,
+    dpi=300
+):
+    """
+    Save refined trade signal plots for each pair and obs_cov combination.
+
+    Parameters
+    ----------
+    signals_df : pd.DataFrame
+        Combined refined signal DataFrame containing 'pair' and 'obs_cov'.
+
+    save_dir : str
+        Directory where plots will be saved.
+
+    plot_func : function
+        Plotting function, e.g. plot_refined_trade_signals.
+
+    dpi : int
+        Resolution for saved figures.
+    """
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    plt.ioff()
+
+    pair_r_combinations = (
+        signals_df[["pair", "obs_cov"]]
+        .drop_duplicates()
+        .sort_values(["pair", "obs_cov"])
+        .itertuples(index=False, name=None)
+    )
+
+    for pair_name, obs_cov in pair_r_combinations:
+
+        plot_func(
+            signals_df=signals_df,
+            pair_name=pair_name,
+            obs_cov=obs_cov
+        )
+
+        clean_pair_name = (
+            str(pair_name)
+            .replace(" ", "_")
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(":", "_")
+        )
+
+        clean_obs_cov = str(obs_cov).replace(".", "p")
+
+        filename = f"refined_{clean_pair_name}_R{clean_obs_cov}.png"
+        filepath = os.path.join(save_dir, filename)
+
+        plt.savefig(filepath, dpi=dpi, bbox_inches="tight")
+        plt.close()
+
+    print(f"Saved all refined trade signal plots to: {save_dir}")
+
 
 def refined_performance_metrics(
     results_dict,

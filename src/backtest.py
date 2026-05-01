@@ -2,6 +2,14 @@ import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
 
+"""
+Contents:
+1) compute_strategy_returns - computes strategy return
+2) plot_trade_signals - plots trade signals (visuals of buy/sell/exit)
+3) performance_metrics - computes performance metrics of our strategies
+"""
+
+
 # Calculate returns for sensitivity analysis 
 def compute_strategy_returns(df):
     df = df.copy()
