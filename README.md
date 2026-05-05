@@ -10,5 +10,6 @@ Econometric Analysis for Applied Project
 
 - Lack of regime analysis
 - Enhanced sensitivity analyis
-- NLP LLM Judge for Economic Reasoning (via. Prompt Engineering)
+- Potentially question the Kalman filter and if there are any other filters that are more viable for our investment universe
 - Investment Universe limits our reasoning and statistical evidence for broader asset classes
+- NLP LLM Judge for Economic Reasoning (via. Prompt Engineering)
