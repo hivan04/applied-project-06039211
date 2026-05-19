@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
+import os
 
 """
 Contents:
@@ -101,102 +102,218 @@ def plot_trade_signals(results_dict, strategy_name, pair_name, obs_cov=None, fig
     plt.tight_layout()
     # plt.show() - Don't include because there are too many plots 
 
-# Function for creating dataframe of performance metrics
+# Portfolio-level performance metrics (takes a plain return Series)
+def performance_metrics(
+    ret,
+    positions=None,
+    rf=None,
+    cost_per_side=0.002,
+    annualisation_factor=252,
+    ret_type="returns",
+    initial_capital=None,
+):
+    ret = ret.copy().dropna()
+    pre_tc_ret = ret.copy()
 
-def performance_metrics(results_dict, rf=None, annualisation_factor=252):
-    performance_rows = []
+    # Transaction costs
+    if positions is not None:
+        pos = positions.reindex(ret.index).fillna(0)
+        position_changes = pos.diff().abs().fillna(pos.abs())
+        tc = position_changes * cost_per_side
+    else:
+        # Charge on days the portfolio transitions between active and flat
+        transitions = (ret != 0).astype(int).diff().abs().fillna(0).astype(bool)
+        tc = transitions.astype(float) * cost_per_side
 
-    # Prepare risk-free rate if provided
+    ret = ret - tc
+
+    # Risk-free rate alignment
     if rf is not None:
-        rf = rf.copy()
-
-        # If date is a column, set it as the index
-        if "date" in rf.columns:
-            rf["date"] = pd.to_datetime(rf["date"])
-            rf = rf.set_index("date")
-
-        rf = rf.sort_index()
-
-        # Use the first column as the RF series
         if isinstance(rf, pd.DataFrame):
-            rf_series = rf.iloc[:, 0]
+            rf = rf.iloc[:, 0]
+        rf = rf.astype(float).reindex(ret.index).ffill()
+        if rf.mean() > 0.1:   # likely annualised (e.g. 0.05 = 5%)
+            rf = rf / annualisation_factor
+        excess_ret = ret - rf
+    else:
+        excess_ret = ret
+
+    if ret_type == "pnl":
+        # Raw P&L path: do NOT use (1+ret).cumprod()
+        total_pnl    = ret.sum()
+        cum_pnl      = ret.cumsum()
+        rolling_max  = cum_pnl.cummax()
+        drawdown     = cum_pnl - rolling_max
+        max_drawdown = drawdown.min()
+
+        if initial_capital is not None:
+            avg_ret_out    = ret.mean() / initial_capital * 100
+            avg_excess_out = excess_ret.mean() / initial_capital * 100
+            total_pnl_out  = total_pnl / initial_capital * 100
+            max_dd_out     = max_drawdown / initial_capital * 100
         else:
-            rf_series = rf
+            avg_ret_out    = ret.mean()
+            avg_excess_out = excess_ret.mean()
+            total_pnl_out  = total_pnl
+            max_dd_out     = max_drawdown
 
-        rf_series = rf_series.astype(float)
+    else:
+        # Proportional return path
+        cum_ret      = (1 + ret).cumprod()
+        rolling_max  = cum_ret.cummax()
+        drawdown     = (cum_ret - rolling_max) / rolling_max
+        max_drawdown = drawdown.min() * 100
+        total_pnl    = 100 * (cum_ret.iloc[-1] - 1)
 
-    for strategy_key, signals_dict in results_dict.items():
+        avg_ret_out    = ret.mean() * 100
+        avg_excess_out = excess_ret.mean() * 100
+        total_pnl_out  = total_pnl
+        max_dd_out     = max_drawdown
 
-        for (pair_name, R), df in signals_dict.items():
+    # Sharpe 
+    sharpe     = excess_ret.mean() / excess_ret.std(ddof=1) if excess_ret.std(ddof=1) != 0 else np.nan
+    ann_sharpe = sharpe * np.sqrt(annualisation_factor) if not np.isnan(sharpe) else np.nan
 
-            df = df.copy()
+    # Hit rate — always on pre-TC signal to measure signal quality
+    active   = pre_tc_ret[pre_tc_ret != 0]
+    hit_rate = (active > 0).mean() * 100 if len(active) > 0 else np.nan
 
-            if "strategy_ret" not in df.columns:
-                df = compute_strategy_returns(df)
+    return pd.Series({
+        "avg_return (%)":        round(avg_ret_out, 4),
+        "avg_excess_return (%)": round(avg_excess_out, 4),
+        "annualised_sharpe":     round(ann_sharpe, 4),
+        "total_pnl":             round(total_pnl_out, 2),
+        "hit_rate (%)":          round(hit_rate, 2),
+        "max_drawdown (%)":      round(max_dd_out, 2),
+        "num_obs":               len(ret),
+    })
 
-            strategy_returns = df["strategy_ret"].dropna()
-
-            if len(strategy_returns) == 0:
-                continue
-
-            # Align risk-free rate to strategy returns
-            if rf is not None:
-                rf_aligned = rf_series.reindex(strategy_returns.index).ffill()
-
-                # Drop observations where RF is still missing
-                valid_idx = rf_aligned.dropna().index
-                strategy_returns = strategy_returns.loc[valid_idx]
-                rf_aligned = rf_aligned.loc[valid_idx]
-
-                excess_returns = strategy_returns - rf_aligned
-            else:
-                excess_returns = strategy_returns
-
-            if len(excess_returns) == 0:
-                continue
-
-            # Display returns in percentage terms
-            avg_return = strategy_returns.mean() * 100
-            avg_excess_return = excess_returns.mean() * 100
-
-            # Total cumulative strategy return/pnl in raw decimal units
-            total_pnl = strategy_returns.sum()
-
-            # Sharpe should be calculated using decimal returns, not percentage returns
-            std_excess_return = excess_returns.std()
-
-            sharpe = (
-                excess_returns.mean() / std_excess_return
-                if std_excess_return != 0
-                else np.nan
-            )
-
-            annualised_sharpe = (
-                sharpe * np.sqrt(annualisation_factor)
-                if not np.isnan(sharpe)
-                else np.nan
-            )
-
-            # Hit rate based on daily positive strategy returns
-            hit_rate = (strategy_returns > 0).mean() * 100
-
-            # Approximate number of round-trip trades
-            num_trades = df["position"].diff().abs().sum() / 2
-
-            performance_rows.append({
-                "strategy": strategy_key,
-                "pair": pair_name,
-                "obs_cov": R,
-                "entry_z": float(strategy_key.split("_")[1]),
-                "exit_z": float(strategy_key.split("_")[3]),
-                "avg_return (%)": avg_return,
-                "avg_excess_return (%)": avg_excess_return,
-                "total_pnl": total_pnl,
-                "sharpe": sharpe,
-                "annualised_sharpe": annualised_sharpe,
-                "hit_rate (%)": hit_rate,
-                "num_trades": num_trades
-            })
-
-    return pd.DataFrame(performance_rows)
-
+# Combining plot
+def plot_combined_pnl(
+    is_results,
+    oos_results,
+    strategy_name="entry_2.0_exit_0.0",
+    obs_cov=1.0,
+    figsize=(14, 3),
+    save_path=None,
+    dpi=300
+):
+    """
+    Plot IS and OOS cumulative PnL side by side per pair, both indexed to 100.
+ 
+    Each row is one pair. Left column = In-Sample, Right column = Out-of-Sample.
+    Both periods start at base 100 so y-axes are directly comparable within
+    each period without large OOS moves squashing the IS curves.
+ 
+    Nothing in is_results or oos_results is modified — all scaling is local
+    to this function.
+ 
+    Parameters
+    ----------
+    is_results : dict
+        Nested dict of shape {strategy_name: {(pair_name, obs_cov): df}}.
+        Same object used throughout notebook 5_backtest.
+    oos_results : dict
+        Same structure as is_results for the OOS period.
+    strategy_name : str
+        Key into is_results / oos_results, e.g. "entry_2.0_exit_0.0".
+    obs_cov : float
+        Observation covariance R value to plot.
+    figsize : tuple
+        (width, height_per_pair). Total figure height scales with pair count.
+    save_path : str or None
+        If provided, saves the figure to this filepath instead of showing it.
+        Include the filename, e.g. "outputs/combined_pnl.png".
+    dpi : int
+        Resolution for saved figure.
+ 
+    Usage
+    -----
+    # Interactive
+    plot_combined_pnl(is_results, oos_results)
+ 
+    # Save to file
+    plot_combined_pnl(
+        is_results, oos_results,
+        strategy_name="entry_2.0_exit_0.0",
+        obs_cov=1.0,
+        save_path=PROJECT_ROOT / "outputs/combined_pnl_entry2_exit0_R1.png"
+    )
+    """
+ 
+    is_signals  = is_results[strategy_name]
+    oos_signals = oos_results[strategy_name]
+ 
+    all_pairs = sorted(set(k[0] for k in is_signals))
+    n = len(all_pairs)
+ 
+    # 2 columns: IS on left, OOS on right
+    fig, axes = plt.subplots(
+        n, 2,
+        figsize=(figsize[0], figsize[1] * n),
+        sharex=False
+    )
+ 
+    # Ensure axes is always 2D even for a single pair
+    if n == 1:
+        axes = [axes]
+ 
+    for row_idx, pair_name in enumerate(all_pairs):
+ 
+        ax_is  = axes[row_idx][0]
+        ax_oos = axes[row_idx][1]
+ 
+        # Match pair + obs_cov in both dicts
+        is_key  = next(
+            (k for k in is_signals  if k[0] == pair_name and np.isclose(float(k[1]), obs_cov)),
+            None
+        )
+        oos_key = next(
+            (k for k in oos_signals if k[0] == pair_name and np.isclose(float(k[1]), obs_cov)),
+            None
+        )
+ 
+        if is_key is None or oos_key is None:
+            ax_is.set_title(f"{pair_name}  [R={obs_cov} not found]")
+            continue
+ 
+        is_df  = compute_strategy_returns(is_signals[is_key].copy())
+        oos_df = compute_strategy_returns(oos_signals[oos_key].copy())
+ 
+        # Both periods independently indexed to base 100
+        is_cumret  = 100 * (1 + is_df["strategy_ret"].fillna(0)).cumprod()
+        oos_cumret = 100 * (1 + oos_df["strategy_ret"].fillna(0)).cumprod()
+ 
+        # --- IS plot (left) ---
+        ax_is.plot(is_cumret.index, is_cumret, color="steelblue", lw=1.5)
+        ax_is.axhline(100, color="grey", linestyle=":", lw=0.8)
+        ax_is.set_title(f"{pair_name}\nIn-Sample", fontsize=9)
+        ax_is.set_ylabel("Portfolio Value (Base = 100)")
+        ax_is.grid(True, alpha=0.3)
+        ax_is.set_xlabel("Date")
+ 
+        # --- OOS plot (right) ---
+        ax_oos.plot(oos_cumret.index, oos_cumret, color="darkorange", lw=1.5)
+        ax_oos.axhline(100, color="grey", linestyle=":", lw=0.8)
+        ax_oos.set_title(f"{pair_name}\nOut-of-Sample", fontsize=9)
+        ax_oos.set_ylabel("Portfolio Value (Base = 100)")
+        ax_oos.grid(True, alpha=0.3)
+        ax_oos.set_xlabel("Date")
+ 
+    fig.suptitle(
+        f"Cumulative PnL  |  {strategy_name}  |  R = {obs_cov}",
+        fontsize=12,
+        y=1.01
+    )
+    plt.tight_layout()
+ 
+    if save_path is not None:
+        os.makedirs(
+            os.path.dirname(str(save_path)) if os.path.dirname(str(save_path)) else ".",
+            exist_ok=True
+        )
+        plt.savefig(save_path, dpi=dpi, bbox_inches="tight")
+        plt.close()
+        print(f"Saved to: {save_path}")
+    else:
+        plt.show()

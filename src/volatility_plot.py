@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from local_config import *
+from src.local_config import *
 
 
 def pair_volatility_plots(
