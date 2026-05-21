@@ -72,7 +72,7 @@ a) Run through the notebooks individually or,
 b) Run through the notebooks using the **run_pipeline.py** script:
 
 ```
-  py run_pipeline.py
+py run_pipeline.py
 ```
 
 *Note to run these, you must have the data used, which has been excluded from the repository due to licensing reasons*
@@ -93,39 +93,42 @@ To pull the correct data, find the following indexes on Bloomberg Terminal (*whi
 The following show the entire investment universe used (pulling the top 30 by market cap from commodity and materials combined):
 
 <details>
-<summary>Full Investment Universe</summary>
-| Ticker (Tech) | Company (Tech)                     | Ticker (Energy/Materials) | Company (Energy/Materials)        |
-|---------------|------------------------------------|---------------------------|-----------------------------------|
-| 700 HK Equity | TENCENT HOLDINGS LTD              | 857 HK Equity             | PETROCHINA CO LTD-H               |
-| 9988 HK Equity| ALIBABA GROUP HOLDING LTD         | 883 HK Equity             | CNOOC LTD-H                       |
-| 1211 HK Equity| BYD CO LTD-H                      | 1088 HK Equity            | CHINA SHENHUA ENERGY CO-H         |
-| 1810 HK Equity| XIAOMI CORP-CLASS B               | 2899 HK Equity            | ZIJIN MINING GROUP CO LTD-H       |
-| 300 HK Equity | MIDEA GROUP CO LTD-H              | 386 HK Equity             | CHINA PETROLEUM & CHEMICAL-H      |
-| 981 HK Equity | SEMICONDUCTOR MANUFACTURING-H     | 3993 HK Equity            | CMOC GROUP LTD-H                  |
-| 9999 HK Equity| NETEASE INC                       | 2259 HK Equity            | ZIJIN GOLD INTERNATIONAL CO       |
-| 3690 HK Equity| MEITUAN-CLASS B                   | 1378 HK Equity            | CHINA HONGQIAO GROUP LTD          |
-| 9618 HK Equity| JD.COM INC-CLASS A                | 2600 HK Equity            | ALUMINUM CORP OF CHINA LTD-H      |
-| 9888 HK Equity| BAIDU INC-CLASS A                 | 1898 HK Equity            | CHINA COAL ENERGY CO-H            |
-| 9961 HK Equity| TRIP.COM GROUP LTD                | 1772 HK Equity            | GANFENG LITHIUM GROUP CO L-H      |
-| 6690 HK Equity| HAIER SMART HOME CO LTD-H         | 1787 HK Equity            | SHANDONG GOLD MINING CO LT-H      |
-| 1024 HK Equity| KUAISHOU TECHNOLOGY               | 1171 HK Equity            | YANKUANG ENERGY GROUP CO-H        |
-| 1347 HK Equity| HUA HONG SEMICONDUCTOR LTD-H      | 358 HK Equity             | JIANGXI COPPER CO LTD-H           |
-| 2015 HK Equity| LI AUTO INC-CLASS A               | 1818 HK Equity            | ZHAOJIN MINING INDUSTRY CO-H      |
-| 6618 HK Equity| JD HEALTH INTERNATIONAL INC       | 1208 HK Equity            | MMG LTD                           |
-| 992 HK Equity | LENOVO GROUP LTD                  | 2099 HK Equity            | CHINA GOLD INTERNATIONAL RES      |
-| 9866 HK Equity| NIO INC-CLASS A                   | 2883 HK Equity            | CHINA OILFIELD SERVICES-H         |
-| 9868 HK Equity| XPENG INC - CLASS A SHARES        | 2788 HK Equity            | CHUANGXIN INDUSTRIES HOLDING      |
-| 1698 HK Equity| TENCENT MUSIC ENT - CLASS A       | 3939 HK Equity            | WANGUO GOLD GROUP LTD             |
-| 9660 HK Equity| HORIZON ROBOTICS INC              | 3858 HK Equity            | JIAXIN INTERNATIONAL RESOURC      |
-| 20 HK Equity  | SENSE TIME GROUP INC-CLASS B      | 1258 HK Equity            | CHINA NONFERROUS MINING CORP      |
-| 9626 HK Equity| BILIBILI INC-CLASS Z              | 3668 HK Equity            | YANCOAL AUSTRALIA LTD             |
-| 241 HK Equity | ALIBABA HEALTH INFORMATION TECH   | 3330 HK Equity            | LINGBAO GOLD GROUP CO LTD-H       |
-| 9863 HK Equity| ZHEJIANG LEAPMOTOR TECHNOLOGY-H   | 1164 HK Equity            | CGN MINING CO LTD                 |
-| 2382 HK Equity| SUNNY OPTICAL TECH                | 2689 HK Equity            | NINE DRAGONS PAPER HOLDINGS       |
-| 285 HK Equity | BYD ELECTRONIC INTL CO LTD        | 2386 HK Equity            | SINOPEC ENGINEERING GROUP-H       |
-| 780 HK Equity | TONGCHENG TRAVEL HOLDINGS LTD     | 2610 HK Equity            | NANSHAN ALUMINIUM INTERNATIO      |
-| 3888 HK Equity| KINGSOFT CORP LTD                 | 3899 HK Equity            | CIMC ENRIC HOLDINGS LTD           |
-| 268 HK Equity | KINGDEE INTERNATIONAL SOFTWARE    | 189 HK Equity             | DONGYUE GROUP                     |
+<summary>Toggle Here</summary>
+
+Full Investment Universe:
+
+| Ticker (Tech)  | Company (Tech)                  | Ticker (Energy/Materials) | Company (Energy/Materials)   |
+| -------------- | ------------------------------- | ------------------------- | ---------------------------- |
+| 700 HK Equity  | TENCENT HOLDINGS LTD            | 857 HK Equity             | PETROCHINA CO LTD-H          |
+| 9988 HK Equity | ALIBABA GROUP HOLDING LTD       | 883 HK Equity             | CNOOC LTD-H                  |
+| 1211 HK Equity | BYD CO LTD-H                    | 1088 HK Equity            | CHINA SHENHUA ENERGY CO-H    |
+| 1810 HK Equity | XIAOMI CORP-CLASS B             | 2899 HK Equity            | ZIJIN MINING GROUP CO LTD-H  |
+| 300 HK Equity  | MIDEA GROUP CO LTD-H            | 386 HK Equity             | CHINA PETROLEUM & CHEMICAL-H |
+| 981 HK Equity  | SEMICONDUCTOR MANUFACTURING-H   | 3993 HK Equity            | CMOC GROUP LTD-H             |
+| 9999 HK Equity | NETEASE INC                     | 2259 HK Equity            | ZIJIN GOLD INTERNATIONAL CO  |
+| 3690 HK Equity | MEITUAN-CLASS B                 | 1378 HK Equity            | CHINA HONGQIAO GROUP LTD     |
+| 9618 HK Equity | JD.COM INC-CLASS A              | 2600 HK Equity            | ALUMINUM CORP OF CHINA LTD-H |
+| 9888 HK Equity | BAIDU INC-CLASS A               | 1898 HK Equity            | CHINA COAL ENERGY CO-H       |
+| 9961 HK Equity | TRIP.COM GROUP LTD              | 1772 HK Equity            | GANFENG LITHIUM GROUP CO L-H |
+| 6690 HK Equity | HAIER SMART HOME CO LTD-H       | 1787 HK Equity            | SHANDONG GOLD MINING CO LT-H |
+| 1024 HK Equity | KUAISHOU TECHNOLOGY             | 1171 HK Equity            | YANKUANG ENERGY GROUP CO-H   |
+| 1347 HK Equity | HUA HONG SEMICONDUCTOR LTD-H    | 358 HK Equity             | JIANGXI COPPER CO LTD-H      |
+| 2015 HK Equity | LI AUTO INC-CLASS A             | 1818 HK Equity            | ZHAOJIN MINING INDUSTRY CO-H |
+| 6618 HK Equity | JD HEALTH INTERNATIONAL INC     | 1208 HK Equity            | MMG LTD                      |
+| 992 HK Equity  | LENOVO GROUP LTD                | 2099 HK Equity            | CHINA GOLD INTERNATIONAL RES |
+| 9866 HK Equity | NIO INC-CLASS A                 | 2883 HK Equity            | CHINA OILFIELD SERVICES-H    |
+| 9868 HK Equity | XPENG INC - CLASS A SHARES      | 2788 HK Equity            | CHUANGXIN INDUSTRIES HOLDING |
+| 1698 HK Equity | TENCENT MUSIC ENT - CLASS A     | 3939 HK Equity            | WANGUO GOLD GROUP LTD        |
+| 9660 HK Equity | HORIZON ROBOTICS INC            | 3858 HK Equity            | JIAXIN INTERNATIONAL RESOURC |
+| 20 HK Equity   | SENSE TIME GROUP INC-CLASS B    | 1258 HK Equity            | CHINA NONFERROUS MINING CORP |
+| 9626 HK Equity | BILIBILI INC-CLASS Z            | 3668 HK Equity            | YANCOAL AUSTRALIA LTD        |
+| 241 HK Equity  | ALIBABA HEALTH INFORMATION TECH | 3330 HK Equity            | LINGBAO GOLD GROUP CO LTD-H  |
+| 9863 HK Equity | ZHEJIANG LEAPMOTOR TECHNOLOGY-H | 1164 HK Equity            | CGN MINING CO LTD            |
+| 2382 HK Equity | SUNNY OPTICAL TECH              | 2689 HK Equity            | NINE DRAGONS PAPER HOLDINGS  |
+| 285 HK Equity  | BYD ELECTRONIC INTL CO LTD      | 2386 HK Equity            | SINOPEC ENGINEERING GROUP-H  |
+| 780 HK Equity  | TONGCHENG TRAVEL HOLDINGS LTD   | 2610 HK Equity            | NANSHAN ALUMINIUM INTERNATIO |
+| 3888 HK Equity | KINGSOFT CORP LTD               | 3899 HK Equity            | CIMC ENRIC HOLDINGS LTD      |
+| 268 HK Equity  | KINGDEE INTERNATIONAL SOFTWARE  | 189 HK Equity             | DONGYUE GROUP                |
 
 </details>
 
