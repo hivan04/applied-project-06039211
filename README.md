@@ -15,4 +15,4 @@ Econometric Analysis for Applied Project
 - Investment Universe limits our reasoning and statistical evidence for broader asset classes
 - NLP LLM Judge for Economic Reasoning (via. Prompt Engineering)
 
-[Interactive version]([Interactive version](docs/project_structure.html))
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/proj-outline.png)
