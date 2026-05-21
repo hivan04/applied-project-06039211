@@ -1,6 +1,6 @@
 import requests 
 import pandas as pd
-from local_config import *
+from src.local_config import *
 
 def pull_hk_rf(
         start_date = "2015-01-01",

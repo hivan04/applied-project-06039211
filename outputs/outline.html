@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pairs Trading — Project Structure</title>
+<style>
+  body { font-family: sans-serif; background: #fff; color: #1a1a1a; }
+  @media (prefers-color-scheme: dark) { body { background: #1a1a19; color: #e0dfd6; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  --color-background-secondary: #f4f3ee;
+  --color-border-primary: rgba(0,0,0,0.4);
+  --color-border-secondary: rgba(0,0,0,0.3);
+  --color-border-tertiary: rgba(0,0,0,0.15);
+  --color-text-primary: #1a1a19;
+  --color-text-secondary: #5f5e5a;
+  --color-text-tertiary: #888780;
+</style>
+</head>
+<body>
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Pairs trading project structure diagram showing data, notebooks, src, and root file directories with an execution pipeline.</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{width:100%;overflow-x:auto;padding:24px 0 32px}
+.canvas{min-width:900px;padding:0 24px}
+.node{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;line-height:1.3;text-align:center;white-space:nowrap;border-width:1px;border-style:solid}
+.node.root{background:#f4f3ee;border-color:rgba(0,0,0,0.4);color:#1a1a19;font-size:14px;padding:9px 28px;border-radius:10px}
+.node.blue{background:#E6F1FB;border-color:#185FA5;color:#0C447C}
+.node.purple{background:#EEEDFE;border-color:#534AB7;color:#3C3489}
+.node.teal{background:#E1F5EE;border-color:#0F6E56;color:#085041}
+.node.gray{background:#f4f3ee;border-color:rgba(0,0,0,0.3);color:#5f5e5a}
+.node.small{font-size:11px;padding:5px 10px;font-weight:400}
+.section{display:flex;flex-direction:column;align-items:center;gap:0;flex:1}
+.children{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:0}
+.connector-v{width:1px;min-height:20px;background:rgba(0,0,0,0.3);margin:0 auto}
+.divider{height:1px;background:rgba(0,0,0,0.15);margin:28px 0;border:none}
+.pipeline{display:flex;align-items:stretch;justify-content:center;gap:0;flex-wrap:nowrap}
+.pipe-node{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:500;text-align:center;border-width:1px;border-style:solid;min-width:120px;flex:1}
+.pipe-node .sub{font-size:11px;font-weight:400;margin-top:3px;opacity:.75}
+.pipe-node.blue{background:#E6F1FB;border-color:#185FA5;color:#0C447C}
+.pipe-node.purple{background:#EEEDFE;border-color:#534AB7;color:#3C3489}
+.pipe-node.teal{background:#E1F5EE;border-color:#0F6E56;color:#085041}
+.pipe-node.amber{background:#FAEEDA;border-color:#854F0B;color:#633806}
+.pipe-node.coral{background:#FAECE7;border-color:#993C1D;color:#712B13}
+.pipe-arrow{display:flex;align-items:center;padding:0 6px;color:#888780;font-size:16px}
+.legend{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#5f5e5a}
+.legend-dot{width:10px;height:10px;border-radius:3px;border-width:1px;border-style:solid;flex-shrink:0}
+.ld-blue{background:#E6F1FB;border-color:#185FA5}
+.ld-purple{background:#EEEDFE;border-color:#534AB7}
+.ld-teal{background:#E1F5EE;border-color:#0F6E56}
+.ld-gray{background:#f4f3ee;border-color:rgba(0,0,0,0.3)}
+@media(prefers-color-scheme:dark){
+  body{background:#1a1a19;color:#e0dfd6}
+  .node.root{background:#2c2c2a;border-color:rgba(255,255,255,0.4);color:#e0dfd6}
+  .node.blue{background:#0C447C;border-color:#378ADD;color:#B5D4F4}
+  .node.purple{background:#3C3489;border-color:#7F77DD;color:#CECBF6}
+  .node.teal{background:#085041;border-color:#1D9E75;color:#9FE1CB}
+  .node.gray{background:#2c2c2a;border-color:rgba(255,255,255,0.3);color:#b4b2a9}
+  .connector-v{background:rgba(255,255,255,0.3)}
+  .divider{background:rgba(255,255,255,0.15)}
+  .pipe-node.blue{background:#0C447C;border-color:#378ADD;color:#B5D4F4}
+  .pipe-node.purple{background:#3C3489;border-color:#7F77DD;color:#CECBF6}
+  .pipe-node.teal{background:#085041;border-color:#1D9E75;color:#9FE1CB}
+  .pipe-node.amber{background:#633806;border-color:#BA7517;color:#FAC775}
+  .pipe-node.coral{background:#712B13;border-color:#D85A30;color:#F5C4B3}
+  .pipe-arrow{color:#888780}
+  .legend-item{color:#b4b2a9}
+  .ld-blue{background:#0C447C;border-color:#378ADD}
+  .ld-purple{background:#3C3489;border-color:#7F77DD}
+  .ld-teal{background:#085041;border-color:#1D9E75}
+  .ld-gray{background:#2c2c2a;border-color:rgba(255,255,255,0.3)}
+}
+</style>
+
+<div class="wrap">
+<div class="canvas">
+
+  <div style="display:flex;justify-content:center;margin-bottom:0">
+    <div class="node root">project root</div>
+  </div>
+  <div class="connector-v" style="min-height:18px"></div>
+
+  <div style="display:flex;justify-content:center;gap:16px;align-items:flex-start">
+
+    <div class="section" style="max-width:200px">
+      <div class="node blue" style="font-size:14px;padding:8px 20px">data/</div>
+      <div class="connector-v" style="min-height:14px"></div>
+      <div class="children">
+        <div class="node blue small">raw_data/</div>
+        <div class="node blue small">df1_is &amp; df1_oos</div>
+        <div class="node blue small">df2_is &amp; df2_oos</div>
+        <div class="node blue small">dynamic_hedge_ratio</div>
+        <div class="node blue small">static_hedge_ratio</div>
+        <div class="node blue small">pairs_is &amp; pairs_oos</div>
+        <div class="node blue small">portfolio_is &amp; _oos</div>
+        <div class="node blue small">rf_is &amp; rf_oos</div>
+      </div>
+    </div>
+
+    <div class="section" style="max-width:230px">
+      <div class="node purple" style="font-size:14px;padding:8px 20px">notebooks/</div>
+      <div class="connector-v" style="min-height:14px"></div>
+      <div class="children" style="flex-direction:column;align-items:stretch;gap:5px">
+        <div class="node purple small">1_data_cleaning.ipynb</div>
+        <div class="node purple small">2_cointegration_test.ipynb</div>
+        <div class="node purple small">3_pairs_strategy.ipynb</div>
+        <div class="node purple small">4_portfolio_construction.ipynb</div>
+        <div class="node purple small">5_trading_signal.ipynb</div>
+        <div class="node purple small">6_backtest.ipynb</div>
+        <div class="node purple small">7_refined_backtest.ipynb</div>
+        <div class="node purple small">8_rolling_backtest.ipynb</div>
+      </div>
+    </div>
+
+    <div class="section" style="max-width:230px">
+      <div class="node teal" style="font-size:14px;padding:8px 20px">src/</div>
+      <div class="connector-v" style="min-height:14px"></div>
+      <div class="children" style="flex-direction:column;align-items:stretch;gap:5px">
+        <div class="node teal small">kalman.py</div>
+        <div class="node teal small">cointegration.py</div>
+        <div class="node teal small">pairs.py</div>
+        <div class="node teal small">portfolio_con.py</div>
+        <div class="node teal small">trading_signal.py</div>
+        <div class="node teal small">refined_trading_signal.py</div>
+        <div class="node teal small">backtest.py</div>
+        <div class="node teal small">rolling_backtest.py</div>
+        <div class="node teal small">drawdown_optimisation.py</div>
+        <div class="node teal small">honia_rf.py</div>
+        <div class="node teal small">plots.py</div>
+        <div class="node teal small">volatility_plot.py</div>
+        <div class="node teal small">utils.py</div>
+        <div class="node teal small">local_config.py</div>
+      </div>
+    </div>
+
+    <div class="section" style="max-width:180px">
+      <div class="node gray" style="font-size:14px;padding:8px 20px">root files</div>
+      <div class="connector-v" style="min-height:14px"></div>
+      <div class="children" style="flex-direction:column;align-items:stretch;gap:5px">
+        <div class="node gray small">master.py</div>
+        <div class="node gray small">README.md</div>
+        <div class="node gray small">requirements.txt</div>
+        <div class="node gray small">.gitignore</div>
+      </div>
+    </div>
+
+  </div>
+
+  <hr class="divider">
+
+  <div style="text-align:center;font-size:11px;color:#888780;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Execution pipeline</div>
+
+  <div class="pipeline">
+    <div class="pipe-node blue">Data prep<div class="sub">nb 1 · cleaning</div></div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-node purple">Cointegration<div class="sub">nb 2 · ADF / VECM</div></div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-node teal">Kalman signal<div class="sub">nb 3–5 · hedge ratio</div></div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-node amber">Backtest<div class="sub">nb 6–7 · IS / OOS</div></div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-node coral">Rolling validation<div class="sub">nb 8 · fold Sharpe</div></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot ld-blue"></div>data/</div>
+    <div class="legend-item"><div class="legend-dot ld-purple"></div>notebooks/</div>
+    <div class="legend-item"><div class="legend-dot ld-teal"></div>src/</div>
+    <div class="legend-item"><div class="legend-dot ld-gray"></div>root files</div>
+  </div>
+
+</div>
+</div>
+</body>
+</html>
