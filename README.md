@@ -17,13 +17,14 @@ In this project, 3 backtests were ran (*all three backtests were run with R = 1,
 
 
 ## Baseline Backtest 
-![image]()
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/trading_signal/cumulative_pnl_base_entry_1.5_exit_0.5_baseline_vs_refined.png)
 
 ## Refined Backtest
-![image]()
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/refined_trading_signal/Combined_entry_1.5_exit_0.5_baseline_vs_refined.png)
 
 ## Rolling-Window Backtest 
-![image]()
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_cumulative_pnl.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_drawdown_and_sharpe.png)
 
 # Limitations of Project :
 *write in conclusion*
