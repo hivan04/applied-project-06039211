@@ -26,6 +26,13 @@ In this project, 3 backtests were ran (*all three backtests were run with R = 1,
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_cumulative_pnl.png)
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_drawdown_and_sharpe.png)
 
+### Sensitivity of Rolling-Window Backtest
+There was a further backtest on the different combination of z-score bands to see the fluctuation in results which can be seen in the plots below:
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_All_Strategies_cumulative_pnl.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_All_Strategies_drawdown.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_All_Strategies_sharpe.png)
+
+
 # Limitations of Project :
 *write in conclusion*
 - Lack of regime analysis
