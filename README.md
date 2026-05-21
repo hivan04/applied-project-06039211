@@ -2,12 +2,19 @@
 
 The main question of this project is to see whether statistical arbitrage works in a highly volatile and emerging sector environement such as Hong Kong Technology and Commodities.
 
-Econometric Analysis for Applied Project
+# Key Results from Backtesting 
+In this project, 3 backtests were ran (*all three backtests were run with R = 1, where R is the observation noise covariance in the Kalman Filter. This value was chosen as a neutral baseline, reflecting equal confidence in observed price updates and the model's prior estimates.*):
 
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/tech_pairs.png)
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/commodities_pairs.png)
+1. Baseline Backtest - this encompasses a static z-score entry/exit and trades based off primarily the Kalman Filter 
+2. Refined Backtest - this builds off the baseline strategy by including different layers of risk management to the signal
+   a) The first refinemnent to the trading signal was implementing a dyanmic z-score band, the same as the baseline but the threshold for entry/exit adjusts accordingly depending on the time-series (of course with no look-ahead bias);
+   b) The second refinement was calculating the dynamic maximum drawdown (via. estimated volatility)
+3. Rolling Window Backtest (12-Month Window) -
 
-### Limitations of project (*write in conclusion*):
+
+
+
+# Limitations of project (*write in conclusion*):
 
 - Lack of regime analysis
 - Enhanced sensitivity analyis
