@@ -135,4 +135,4 @@ Full Investment Universe:
 # Outline of Pipeline
 
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/proj-outline.png)
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/proj-outline.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/proj-structure.png)
