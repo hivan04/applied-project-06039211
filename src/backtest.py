@@ -111,6 +111,9 @@ def performance_metrics(
     annualisation_factor=252,
     ret_type="returns",
     initial_capital=None,
+    bootstrap_ci=False,
+    n_bootstrap=1000,
+    bootstrap_seed=None,
 ):
     ret = ret.copy().dropna()
     pre_tc_ret = ret.copy()
@@ -170,9 +173,21 @@ def performance_metrics(
         total_pnl_out  = total_pnl
         max_dd_out     = max_drawdown
 
-    # Sharpe 
+    # Sharpe
     sharpe     = excess_ret.mean() / excess_ret.std(ddof=1) if excess_ret.std(ddof=1) != 0 else np.nan
     ann_sharpe = sharpe * np.sqrt(annualisation_factor) if not np.isnan(sharpe) else np.nan
+
+    if bootstrap_ci and not np.isnan(ann_sharpe):
+        from src.bootstrap import bootstrap_sharpe_ci
+        ci = bootstrap_sharpe_ci(
+            excess_ret,
+            n_bootstrap=n_bootstrap,
+            annualisation_factor=annualisation_factor,
+            seed=bootstrap_seed,
+        )
+        sharpe_display = f"{ann_sharpe:.4f}  [{ci['ci_lower']:.4f}, {ci['ci_upper']:.4f}]"
+    else:
+        sharpe_display = round(ann_sharpe, 4)
 
     # Hit rate — always on pre-TC signal to measure signal quality
     active   = pre_tc_ret[pre_tc_ret != 0]
@@ -181,7 +196,7 @@ def performance_metrics(
     return pd.Series({
         "avg_return (%)":        round(avg_ret_out, 4),
         "avg_excess_return (%)": round(avg_excess_out, 4),
-        "annualised_sharpe":     round(ann_sharpe, 4),
+        "annualised_sharpe":     sharpe_display,
         "total_pnl":             round(total_pnl_out, 2),
         "hit_rate (%)":          round(hit_rate, 2),
         "max_drawdown (%)":      round(max_dd_out, 2),

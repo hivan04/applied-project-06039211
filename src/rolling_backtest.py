@@ -56,8 +56,12 @@ def walk_forward_backtest(
     start_idx = is_window
 
     while start_idx + oos_step <= n:
-        oos_end_idx  = start_idx + oos_step
-        context_dates = all_dates[:oos_end_idx]
+        oos_end_idx   = start_idx + oos_step
+        is_start_idx  = max(0, start_idx - is_window)
+        # Sliding window: only IS_window + OOS_step days so history doesn't
+        # expand fold-over-fold (z-score is rolling-60 so older data has no effect,
+        # but a fixed window keeps each fold's context consistent).
+        context_dates = all_dates[is_start_idx:oos_end_idx]
         oos_dates     = all_dates[start_idx:oos_end_idx]
 
         details_fold = {
@@ -112,8 +116,9 @@ def walk_forward_refined_backtest(
     start_idx = is_window
 
     while start_idx + oos_step <= n:
-        oos_end_idx   = start_idx + oos_step
-        context_dates = all_dates[:oos_end_idx]
+        oos_end_idx  = start_idx + oos_step
+        is_start_idx = max(0, start_idx - is_window)
+        context_dates = all_dates[is_start_idx:oos_end_idx]
         oos_dates     = all_dates[start_idx:oos_end_idx]
 
         details_fold = {
@@ -122,6 +127,10 @@ def walk_forward_refined_backtest(
             if np.isclose(float(k[1]), obs_cov) and k[0] in weights
         }
 
+        # generate_refined_kalman_signals_2 computes trade_pnl = active_position *
+        # spread_t.diff() on the full context, so spread_change on the first OOS day
+        # is anchored by the last IS day — slicing first and re-diffing would make
+        # that first day NaN (losing one return per fold).
         signals_df  = generate_refined_kalman_signals_2(details_fold, **refined_kwargs)
         oos_signals = signals_df[signals_df.index.isin(oos_dates)]
 
@@ -129,10 +138,7 @@ def walk_forward_refined_backtest(
         for pair_name, group in oos_signals.groupby("pair"):
             if pair_name not in weights:
                 continue
-            group = group.copy()
-            group["spread_change"] = group["spread_t"].diff()
-            group["strategy_ret"]  = group["active_position"] * group["spread_change"]
-            ret = group["strategy_ret"].dropna()
+            ret = group["trade_pnl"].dropna()
             if len(ret) > 0:
                 pair_rets[pair_name] = ret * weights[pair_name]
 
@@ -155,8 +161,21 @@ def rolling_sharpe(portfolio_ret, window=63, annualisation_factor=252):
     return sharpe.rename("rolling_sharpe")
 
 
-def plot_rolling_backtest(portfolio_ret, window=63, figsize=(14, 8)):
-    """Cumulative PnL and rolling Sharpe for walk-forward results."""
+def plot_rolling_backtest(portfolio_ret, window=63, figsize=(14, 8), is_oos_split=None):
+    """
+    Cumulative PnL and rolling Sharpe for walk-forward results.
+
+    Parameters
+    ----------
+    portfolio_ret : pd.Series
+        Daily portfolio returns.
+    window : int
+        Rolling Sharpe window in trading days. Default 63 (~1 quarter).
+    figsize : tuple
+    is_oos_split : str or pd.Timestamp, optional
+        Date of the IS/OOS split. When provided, a vertical dotted line is
+        drawn on both subplots to mark where OOS begins.
+    """
     cum_pnl = 100 * (1 + portfolio_ret.fillna(0)).cumprod()
     roll_sr  = rolling_sharpe(portfolio_ret, window)
 
@@ -181,6 +200,17 @@ def plot_rolling_backtest(portfolio_ret, window=63, figsize=(14, 8)):
     axes[1].set_xlabel("Date")
     axes[1].grid(True, alpha=0.3)
     axes[1].legend(fontsize=8)
+
+    if is_oos_split is not None:
+        split_date = pd.Timestamp(is_oos_split)
+        for ax in axes:
+            ax.axvline(
+                split_date,
+                color="black", linestyle=":", lw=1.4,
+                label="IS / OOS split",
+            )
+        # Only add the label to the legend of the top panel
+        axes[0].legend(fontsize=8)
 
     for ax in axes:
         ax.xaxis.set_major_locator(mdates.YearLocator())
