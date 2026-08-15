@@ -1,6 +1,6 @@
 # Statistical Arbitrage using Co-Integration in HK Tech & Commodities
 
-The main question of this project is to see whether statistical arbitrage works in a highly volatile and emerging sector environement such as Hong Kong Technology and Commodities.
+The main question of this project is to see whether statistical arbitrage works in the Hong Kong sectors: Technology and Commodities.
 
 # Contents
 
