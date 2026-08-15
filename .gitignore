@@ -2,8 +2,5 @@ archive/
 venv/
 data/
 .DS_Store
-.gitignore.DS_Store
 .claude/
-/Users/ivanhung/Documents/GitHub/applied-project-06039211/src/rf.py
 latex/
-.gitignore

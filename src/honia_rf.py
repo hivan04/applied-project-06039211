@@ -1,4 +1,13 @@
-import requests 
+import sys
+from pathlib import Path
+
+# Make `from src...` imports work regardless of how/where this file is run
+# (repo root, `src/`, IDE "Run" button, etc.) by putting the repo root on sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+import requests
 import pandas as pd
 from src.local_config import *
 
@@ -66,30 +75,40 @@ def pull_hk_rf(
         .sort_index()
     )
 
+    # The HKMA API does not reliably honour the from/to params (it can return
+    # its full available history regardless), so enforce the requested window
+    # ourselves to keep this function's output deterministic and match its docstring.
+    rf = rf.loc[start_date:end_date]
+
     return rf
 
-# Fetch using function from above and save to a dataframe
-rf_honia = pull_hk_rf(start_date="2021-01-01", end_date="2023-12-31")
 
-print(rf_honia.head())
-print(f"\nAnnualised range (%):\n{(rf_honia['rf'] * 252 * 100).describe().round(4)}")
+def main():
+    """Fetch HONIA, save the full series and the IS/OOS split to data/.
 
-# Save to CSV 
-rf_honia.to_csv(PROJECT_ROOT / "data/raw_data/rf_honia.csv", index=True)
-print("\nSaved to rf_honia.csv")
+    Date range and split point match notebook 1's price-data setup
+    (START_DATE="2015-01-01"/"2026-01-01", split_date="2022-10-01") so the
+    risk-free series lines up with the return series it gets reindexed against.
+    """
+    rf_honia = pull_hk_rf(start_date="2015-01-01", end_date="2026-01-01")
 
-# Ensure that the date is time-set before splitting data
-# rf_honia["date"] = pd.to_datetime(rf_honia["date"])
-# rf_honia = rf_honia.set_index("date").sort_index()
+    print(rf_honia.head())
+    print(f"\nAnnualised range (%):\n{(rf_honia['rf'] * 252 * 100).describe().round(4)}")
 
-# Split the risk-free rate into the training and testing set split respectively 
+    rf_honia.to_csv(PROJECT_ROOT / "data/raw_data/rf_honia.csv", index=True)
+    print("\nSaved to rf_honia.csv")
 
-split_date = pd.Timestamp("2021-01-01")
+    # Split the risk-free rate into the training and testing set split respectively
+    split_date = pd.Timestamp("2022-10-01")
 
-rf_is  = rf_honia.loc[rf_honia.index < split_date].copy()
-rf_oos = rf_honia.loc[rf_honia.index >= split_date].copy()
+    rf_is  = rf_honia.loc[rf_honia.index < split_date].copy()
+    rf_oos = rf_honia.loc[rf_honia.index >= split_date].copy()
 
-rf_is.to_csv(PROJECT_ROOT / "data/rf_is")
-rf_oos.to_csv(PROJECT_ROOT / "data/rf_oos")
+    rf_is.to_csv(PROJECT_ROOT / "data/rf_is")
+    rf_oos.to_csv(PROJECT_ROOT / "data/rf_oos")
+
+
+if __name__ == "__main__":
+    main()
 
 

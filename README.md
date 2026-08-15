@@ -20,7 +20,7 @@ In this project, 3 backtests were ran (*all three backtests were run with R = 1,
 
 1. Baseline Backtest - this encompasses a static z-score entry/exit and trades based off primarily the Kalman Filter
 2. Refined Backtest - this builds off the baseline strategy by including different layers of risk management to the signal
-   a) The first refinemnent to the trading signal was implementing a dyanmic z-score band, the same as the baseline but the threshold for entry/exit adjusts accordingly depending on the time-series (of course with no look-ahead bias);
+   a) The first refinement to the trading signal was implementing a dyanmic z-score band, the same as the baseline but the threshold for entry/exit adjusts accordingly depending on the time-series (of course with no look-ahead bias);
    b) The second refinement was calculating the dynamic maximum drawdown (via. estimated volatility)
 3. Rolling Window Backtest (12-Month Window) - backtested both the baseline and refined trading signals using rolling window analysis.
 
