@@ -26,16 +26,16 @@ In this project, 3 backtests were ran (*all three backtests were run with R = 1,
 
 ## Baseline Backtest
 
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/trading_signal/cumulative_pnl_base_entry_1.5_exit_0.5_baseline_vs_refined.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/trading_signal/cumulative_pnl_base_entry_1.5_exit_0.0_baseline_vs_refined.png)
 
 ## Refined Backtest
 
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/refined_trading_signal/Combined_entry_1.5_exit_0.5_baseline_vs_refined.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/refined_trading_signal/Combined_entry_1.5_exit_0.0_baseline_vs_refined.png)
 
 ## Rolling-Window Backtest
 
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_cumulative_pnl.png)
-![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.5_drawdown_and_sharpe.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.0_cumulative_pnl.png)
+![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_entry_1.5_exit_0.0_drawdown_and_sharpe.png)
 
 ### Sensitivity of Rolling-Window Backtest
 
@@ -45,27 +45,22 @@ There was a further backtest on the different combination of z-score bands to se
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_All_Strategies_drawdown.png)
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/rolling_outputs/WalkForward_All_Strategies_sharpe.png)
 
-As we can see, the cumulative returns of each z-score band region is what we expect to see, the pnl is the largest when the z-score bands are the most flexible. As a result, we use a z-entry of 1.5 and z-exit of 0.5 throughout our analysis as it provides the best of both worlds, in terms of risk and return (which we found in our sensitivity analysis in the backtest notebook):
+As we can see, the cumulative returns of each z-score band region is what we expect to see, the pnl is the largest when the z-score bands are the most flexible. As a result, we use a z-entry of 1.5 and z-exit of 0.0 throughout our analysis as it provides the best of both worlds, in terms of risk and return (which we found in our sensitivity analysis in the backtest notebook):
 
 ![image](https://github.com/hivan04/applied-project-06039211/blob/main/outputs/z-sensitivity.png)
 
 # Running project on your own device
 
-Start by creating a virtual environment (venv)
+Start by creating a virtual environment (venv):
 
 ```
 py -m venv venv
-venv source/bin/activate
+source venv/bin/activate      # Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
 
-Before running, ensure you create a `local_config.py` file that directs the data to where the cloned repository is stored:
-
-```
-from pathlib import Path
-PROJECT_ROOT = Path({your_path_here})
-```
+No further setup is needed — `src/local_config.py` resolves the project root automatically from its own file location, so it works out of the box regardless of where you clone the repo.
 
 To run, you can either:
 a) Run through the notebooks individually or,

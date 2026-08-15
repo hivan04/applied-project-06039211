@@ -34,7 +34,7 @@ def adf_test(series, maxlag=None, regression="c", autolag="AIC"):
             "used_lag": np.nan,
             "n_obs": len(series),
             "critical_values": {},
-            "is_stationary_5pct": False
+            "is_stationary_10pct": False
         }
 
     result = adfuller(series, maxlag=maxlag, regression=regression, autolag=autolag)
@@ -45,7 +45,7 @@ def adf_test(series, maxlag=None, regression="c", autolag="AIC"):
         "used_lag": result[2],
         "n_obs": result[3],
         "critical_values": result[4],
-        "is_stationary_5pct": result[1] < 0.10
+        "is_stationary_10pct": result[1] < 0.10
     }
 
 # Determine integration order
@@ -60,7 +60,7 @@ def determine_integration_order(series, max_diff=2, regression="c"):
         test_result = adf_test(current_series, regression=regression)
         tests[f"I({d})"] = test_result
 
-        if test_result["is_stationary_5pct"]:
+        if test_result["is_stationary_10pct"]:
             return {
                 "order": d,
                 "tests": tests
