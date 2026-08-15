@@ -1,0 +1,5 @@
+scope,strategy,avg_return (%),avg_excess_return (%),annualised_sharpe,total_pnl,hit_rate (%),max_drawdown (%),num_obs
+Full sample,Dynamic selection,0.2224,0.2158,"4.1089  [3.5930, 4.6343]",28237.12,62.37,-10.43,2583
+Full sample,Static selection,0.2325,0.233,"2.2656  [1.7668, 2.7722]",28366.57,58.5,-16.56,2583
+Out-of-sample,Dynamic selection,0.2317,0.2192,"4.2034  [3.2922, 5.1472]",539.98,63.64,-6.28,814
+Out-of-sample,Static selection,0.2171,0.2046,"2.0708  [1.1338, 3.1021]",428.64,58.6,-16.56,814

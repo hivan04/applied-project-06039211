@@ -1,3 +1,15 @@
+"""
+plots.py — Spread / z-score computation and multi-pair diagnostic plots.
+
+Contents
+--------
+compute_spread            : y - (intercept + hedge_ratio * x)
+compute_zscore            : rolling (or full-sample) z-score of a series
+plot_multiple_price_pairs : grid of paired price series
+plot_multiple_spreads     : grid of pair spreads
+plot_multiple_zscores     : grid of pair z-scores with entry/exit bands
+"""
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -70,11 +82,17 @@ def compute_zscore(series, window=None):
     return zscore
 
 # Plots
-def plot_multiple_price_pairs(df, pairs, figsize=(10, 12)):
+def plot_multiple_price_pairs(df, pairs, figsize=None, height_per_row=1.8):
     """
     Plot multiple already-transformed price pairs stacked vertically.
+
+    Figure height scales with the number of pairs (``height_per_row`` inches
+    each) so titles/axis labels don't overlap when many pairs are passed in.
+    Pass an explicit ``figsize`` to override this.
     """
     n = len(pairs)
+    if figsize is None:
+        figsize = (10, max(3, height_per_row * n))
     fig, axes = plt.subplots(n, 1, figsize=figsize, sharex=True)
 
     if n == 1:
@@ -93,7 +111,7 @@ def plot_multiple_price_pairs(df, pairs, figsize=(10, 12)):
     plt.tight_layout()
     plt.show()
 
-def plot_multiple_spreads(spread_dict, figsize=(10, 12)):
+def plot_multiple_spreads(spread_dict, figsize=None, height_per_row=1.8):
     """
     Plot multiple spread time series stacked vertically.
 
@@ -101,12 +119,15 @@ def plot_multiple_spreads(spread_dict, figsize=(10, 12)):
     ----------
     spread_dict : dict
         Dictionary of {pair_name: spread_series}
-    color : str, default "black"
-        Line color for all plots
-    figsize : tuple, default (10, 12)
-        Figure size
+    figsize : tuple, optional
+        Figure size. If omitted, height scales with the number of pairs
+        (``height_per_row`` inches each) so labels don't overlap.
+    height_per_row : float
+        Inches of figure height per pair when ``figsize`` is not given.
     """
     n = len(spread_dict)
+    if figsize is None:
+        figsize = (10, max(3, height_per_row * n))
     fig, axes = plt.subplots(n, 1, figsize=figsize, sharex=True)
 
     # Handle single plot case
@@ -129,7 +150,7 @@ def plot_multiple_spreads(spread_dict, figsize=(10, 12)):
 
 # --- #
 
-def plot_multiple_zscores(zscore_dict, color="black", figsize=(10, 12)):
+def plot_multiple_zscores(zscore_dict, color="black", figsize=None, height_per_row=1.8):
     """
     Plot multiple z-score time series stacked vertically.
 
@@ -139,10 +160,15 @@ def plot_multiple_zscores(zscore_dict, color="black", figsize=(10, 12)):
         Dictionary of {pair_name: zscore_series}
     color : str, default "black"
         Line color for all plots
-    figsize : tuple, default (10, 12)
-        Figure size
+    figsize : tuple, optional
+        Figure size. If omitted, height scales with the number of pairs
+        (``height_per_row`` inches each) so labels don't overlap.
+    height_per_row : float
+        Inches of figure height per pair when ``figsize`` is not given.
     """
     n = len(zscore_dict)
+    if figsize is None:
+        figsize = (10, max(3, height_per_row * n))
     fig, axes = plt.subplots(n, 1, figsize=figsize, sharex=True)
 
     # If only one plot, make axes iterable

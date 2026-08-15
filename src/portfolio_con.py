@@ -1,3 +1,18 @@
+"""
+portfolio_con.py — Portfolio construction: collinearity pruning and exposures.
+
+Iteratively drops collinear pairs (pairwise correlation, then VIF) so the
+retained book is not dominated by redundant, correlated bets, and computes net
+per-stock exposure across the held pairs.
+
+Contents
+--------
+_compute_vif           : (helper) VIF for each column of a returns frame
+_drop_high_correlation : (helper) drop pairs above a correlation threshold
+portfolio_diagnostics  : correlation + VIF pruning; returns retained/dropped pairs
+net_stock_exposures    : net long/short notional per underlying stock
+"""
+
 import pandas as pd
 import numpy as np
 from statsmodels.stats.outliers_influence import variance_inflation_factor

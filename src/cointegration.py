@@ -6,11 +6,18 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.stattools import coint 
 
 """
-HELPERS:
-- adf_test - stationarity test
-- determine_integration_order - first diagnostic for cointegration prescence 
-- run_ols - part i of engle granger test
-- estimate_ecm - regression on error term if cointegration found
+cointegration.py — Engle-Granger cointegration testing for pairs.
+
+Contents
+--------
+adf_test                    : Augmented Dickey-Fuller stationarity test
+determine_integration_order : order of integration I(d) via repeated ADF tests
+run_ols                     : Engle-Granger step 1 (y = a + b*x + u)
+estimate_ecm                : error-correction model on the cointegrating residual
+analyze_pair                : full Engle-Granger workflow for one pair
+analyze_rolling_pair        : Engle-Granger + rolling-window temporal-stability check
+summarize_results           : summary table from a {pair: result} dict
+summarize_results_list      : summary table from a list of result dicts
 """
 
 # ADF test
@@ -38,7 +45,7 @@ def adf_test(series, maxlag=None, regression="c", autolag="AIC"):
         "used_lag": result[2],
         "n_obs": result[3],
         "critical_values": result[4],
-        "is_stationary_5pct": result[1] < 0.05
+        "is_stationary_5pct": result[1] < 0.10
     }
 
 # Determine integration order
@@ -155,8 +162,8 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
 
     residual_adf = adf_test(residuals, regression=regression)
     cointegrated = (
-        residual_adf["p_value"] < 0.05 and
-        coint_pvalue < 0.05
+        residual_adf["p_value"] < 0.10 and
+        coint_pvalue < 0.10
     )
 
     params = ols_model.params
@@ -194,17 +201,35 @@ def analyze_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2)
 
     return results
 
-# 滚动协整检验（252天窗口）
-# Rolling cointegration analysis
-def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max_diff=2):
+# Rolling cointegration analysis (sliding-window Engle-Granger).
+def analyze_rolling_pair(
+    y_series,
+    x_series,
+    pair_name=None,
+    regression="c",
+    max_diff=2,
+    window=252,
+    step=21,
+    coint_alpha=0.10,
+    min_pass_rate=0.8,
+):
     """
-    Full workflow for one pair:
-    1. Align data
-    2. Check both series are I(1)
-    3. Run OLS
-    4. Test residual stationarity
-    5. Cross-check with coint()
-    6. Estimate ECM if cointegrated
+    Test whether a pair is cointegrated AND whether that cointegration is
+    stable THROUGH TIME, by sliding a `window`-day window across the sample
+    (advancing `step` days each time) and running the Engle-Granger coint()
+    test inside every window.
+
+    A pair is accepted only if:
+      1. it is cointegrated over the FULL sample (residual ADF stationary and
+         coint() p < `coint_alpha`), and
+      2. it is cointegrated in at least `min_pass_rate` of the rolling windows.
+
+    Point (2) is the temporal-stability check the previous full-sample-only
+    version could not provide: a relationship that only cointegrates because of
+    one regime will pass the full-sample test but fail here.
+
+    Returns the same keys as analyze_pair (so summarize_results_list works),
+    plus: rolling_pass_rate, n_windows, n_windows_cointegrated, window, step.
     """
     df = pd.concat(
         [
@@ -247,7 +272,7 @@ def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max
         results["decision"] = "Both series are not I(1), so standard Engle-Granger is not appropriate"
         return results
 
-    # Run OLS in levels
+    # --- Full-sample OLS + Engle-Granger (hedge ratio + full-sample gate) ---
     ols_model, residuals = run_ols(y, x)
 
     hedge_ratio = ols_model.params.get("x", np.nan)
@@ -259,18 +284,15 @@ def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max
         "rsquared": ols_model.rsquared
     }
 
-    # Store OLS outputs
     results["hedge_ratio"] = hedge_ratio
     results["intercept"] = intercept
     results["spread"] = residuals
     results["y_aligned"] = y
     results["x_aligned"] = x
 
-    # Residual stationarity test (Engle-Granger step 2)
     resid_adf = adf_test(residuals, regression=regression)
     results["residual_adf"] = resid_adf
 
-    # Built-in cointegration test cross-check
     coint_stat, coint_pvalue, coint_crit = coint(y, x)
     results["coint_test"] = {
         "test_stat": coint_stat,
@@ -282,18 +304,49 @@ def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max
         }
     }
     results["coint_test_pvalue"] = coint_pvalue
+    full_sample_coint = resid_adf["is_stationary_10pct"] and (coint_pvalue < coint_alpha)
 
-    # Require both tests to pass
-    cointegrated = (
-        resid_adf["is_stationary_5pct"] and
-        coint_pvalue < 0.05
-    )
+    # --- Rolling window: run coint() inside each sliding window ---
+    n = len(df)
+    win = min(window, n)
+    n_windows = 0
+    n_coint = 0
+    for start in range(0, n - win + 1, step):
+        yw = y.iloc[start:start + win]
+        xw = x.iloc[start:start + win]
+        try:
+            _, pw, _ = coint(yw, xw)
+        except Exception:
+            continue
+        n_windows += 1
+        if pw < coint_alpha:
+            n_coint += 1
+
+    pass_rate = (n_coint / n_windows) if n_windows else np.nan
+    results["rolling_pass_rate"] = pass_rate
+    results["n_windows"] = n_windows
+    results["n_windows_cointegrated"] = n_coint
+    results["window"] = win
+    results["step"] = step
+
+    # Decision: cointegrated on the full sample AND stable across rolling windows.
+    if n_windows == 0:
+        # Sample too short to roll -> fall back to the full-sample decision.
+        cointegrated = full_sample_coint
+        note = "no rolling windows (sample shorter than window)"
+    else:
+        stable = pass_rate >= min_pass_rate
+        cointegrated = full_sample_coint and stable
+        note = f"rolling pass-rate {pass_rate:.0%} over {n_windows} windows (min {min_pass_rate:.0%})"
 
     if not cointegrated:
-        results["decision"] = "Residual is not stationary or coint() does not confirm cointegration"
+        if not full_sample_coint:
+            results["decision"] = f"Not cointegrated over full sample; {note}"
+        else:
+            results["decision"] = f"Cointegrated full-sample but unstable through time: {note}"
         return results
 
-    # ECM
+    # ECM (only for accepted, stable pairs)
     ecm_model, ecm_df = estimate_ecm(y, x, residuals.shift(1))
     results["ecm_summary"] = {
         "params": ecm_model.params.to_dict(),
@@ -304,7 +357,7 @@ def analyze_rolling_pair(y_series, x_series, pair_name=None, regression="c", max
 
     # Cointegration accepted
     results["cointegrated"] = True
-    results["decision"] = "Cointegration"
+    results["decision"] = f"Cointegration (stable): {note}"
 
     return results
 
@@ -341,6 +394,8 @@ def summarize_results_list(results_list):
             "hedge_ratio": res.get("hedge_ratio"),
             "residual_adf_pvalue": res.get("residual_adf", {}).get("p_value"),
             "coint_test_pvalue": res.get("coint_test_pvalue"),
+            "rolling_pass_rate": res.get("rolling_pass_rate"),
+            "n_windows": res.get("n_windows"),
             "ecm_coef": res.get("ecm_summary", {}).get("params", {}).get("ect_lag"),
             "decision": res.get("decision")
         })

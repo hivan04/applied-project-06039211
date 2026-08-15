@@ -1,17 +1,20 @@
 import numpy as np
-import pandas as pd 
+import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from src.bootstrap import bootstrap_sharpe_ci
+from src.config import TRANSACTION_COST_PER_LEG, TRANSACTION_LEGS
 
 """
 Contents:
 1) compute_strategy_returns - computes strategy return
-2) plot_trade_signals - plots trade signals (visuals of buy/sell/exit)
-3) performance_metrics - computes performance metrics of our strategies
+2) leg_transaction_costs - per-pair turnover-based transaction costs
+3) plot_trade_signals - plots trade signals (visuals of buy/sell/exit)
+4) performance_metrics - computes performance metrics of our strategies
 """
 
 
-# Calculate returns for sensitivity analysis 
+# Calculate returns for sensitivity analysis
 def compute_strategy_returns(df):
     df = df.copy()
 
@@ -22,6 +25,38 @@ def compute_strategy_returns(df):
     df["strategy_ret"] = df["position"].shift(1) * df["spread_ret"]
 
     return df
+
+
+# Per-pair transaction costs (in spread-return units), driven by position turnover.
+def leg_transaction_costs(position, cost_per_leg=TRANSACTION_COST_PER_LEG, n_legs=TRANSACTION_LEGS):
+    """
+    Transaction cost per period for a single pair, charged on position turnover.
+
+    A pairs trade has ``n_legs`` legs (default 2: long one name, short the other),
+    so each unit of |Δposition| transacts every leg once. Entering or exiting a
+    full position costs ``n_legs * cost_per_leg``; a flip (+1 -> -1) costs double;
+    partial adjustments (e.g. 1.0 -> 0.5 exposure) are charged pro-rata.
+
+    Parameters
+    ----------
+    position : pd.Series
+        Position/exposure series for one pair (e.g. -1, 0, +1, or fractional).
+    cost_per_leg : float
+        Fractional cost per leg per unit turnover (0.0015 = 15 bps).
+    n_legs : int
+        Number of legs transacted per unit of position (2 for a pair).
+
+    Returns
+    -------
+    pd.Series
+        Non-negative cost aligned to ``position`` (same index).
+    """
+    pos = pd.Series(position).astype(float).fillna(0.0)
+    turnover = pos.diff().abs()
+    if len(turnover):
+        # Opening the very first position also incurs a cost.
+        turnover.iloc[0] = abs(pos.iloc[0])
+    return turnover * n_legs * cost_per_leg
 
 
 # Plotting buy and sell positions of trade signals (with z-score thresholds)
@@ -178,7 +213,6 @@ def performance_metrics(
     ann_sharpe = sharpe * np.sqrt(annualisation_factor) if not np.isnan(sharpe) else np.nan
 
     if bootstrap_ci and not np.isnan(ann_sharpe):
-        from src.bootstrap import bootstrap_sharpe_ci
         ci = bootstrap_sharpe_ci(
             excess_ret,
             n_bootstrap=n_bootstrap,

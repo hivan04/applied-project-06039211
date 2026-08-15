@@ -1,15 +1,32 @@
+"""
+bootstrap.py — Bootstrap confidence intervals for the Sharpe ratio.
+
+Circular block bootstrap that preserves autocorrelation in daily returns, plus
+plotting helpers to visualise and compare the resulting CIs across strategies.
+
+Contents
+--------
+bootstrap_sharpe_ci     : block-bootstrap CI for the annualised Sharpe ratio
+_annualised_sharpe      : (helper) annualised Sharpe of a return series
+_circular_block_sample  : (helper) one circular block-bootstrap resample
+plot_sharpe_ci          : plot one strategy's Sharpe point estimate + CI
+compare_sharpe_cis      : plot several strategies' Sharpe CIs side by side
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+from src.config import N_BOOTSTRAP, ANNUALISATION_FACTOR, BOOTSTRAP_SEED
 
 
 def bootstrap_sharpe_ci(
     returns,
-    n_bootstrap=1000,
+    n_bootstrap=N_BOOTSTRAP,
     block_size=None,
     ci=0.95,
-    annualisation_factor=252,
+    annualisation_factor=ANNUALISATION_FACTOR,
     rf=None,
-    seed=None,
+    seed=BOOTSTRAP_SEED,
 ):
     """
     Block bootstrap confidence interval for the annualised Sharpe ratio.

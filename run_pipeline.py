@@ -27,11 +27,9 @@ NOTEBOOKS = [
     "notebooks/3_pairs_strategy.ipynb",
     "notebooks/4_portfolio_construction.ipynb",
     "notebooks/5_trading_signal.ipynb",
-    "notebooks/6_backtest.ipynb",
-    "notebooks/7_refined_backtest.ipynb",
-    "notebooks/8_rolling_backtest.ipynb",
+    "notebooks/6_backtests.ipynb",        
+    "notebooks/7_combined_results.ipynb",
 ]
-
 
 def run_notebook(path: str) -> bool:
     print(f"\n{'='*60}")
