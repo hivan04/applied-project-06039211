@@ -7,6 +7,9 @@ names for tickers added in the 2020 re-pull were sourced from public HKEX /
 Bloomberg listings; verify against Bloomberg (LONG_COMP_NAME) if used in the
 final report. Note: 990 HK = Deep Source Holdings (formerly Theme International)
 does not look like an energy/materials name and may be a stray in the pull.
+
+This is for graph purposes, to streamline the pipeline, this script wouldn't be needed.
+Intention here is for visualisation for final report.
 """
 
 TICKER_NAMES = {

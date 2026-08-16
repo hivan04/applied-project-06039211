@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 # Make `from src...` imports work regardless of how/where this file is run
-# (repo root, `src/`, IDE "Run" button, etc.) by putting the repo root on sys.path.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
