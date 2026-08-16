@@ -104,8 +104,7 @@ def label_pair(pair, sep=" vs ", names_only=True):
     """Relabel a pair string with company names.
 
     '1347 HK Equity vs 268 HK Equity' -> 'Hua Hong Semi vs Kingdee'
-    Accepts both 'A vs B' and 'A-B' separators. With names_only=False the
-    ticker code is kept, e.g. '1347 (Hua Hong Semi) vs 268 (Kingdee)'.
+    Accepts both 'A vs B' and 'A-B' (Hua Hong Semi) vs 268 (Kingdee)'.
     """
     raw_sep = sep if sep in pair else ("-" if "-" in pair else sep)
     legs = [p.strip() for p in pair.split(raw_sep)]
