@@ -85,7 +85,7 @@ To pull the correct data, find the following indexes on Bloomberg Terminal (*whi
 | Commodity | Hang Seng Composite Energy    | HSCIE Index      |
 | Materials | Hang-Seng Composite Materials | HSCIM Index      |
 
-The following show the entire investment universe used (pulling the top 30 by market cap from commodity and materials combined):
+The following show the entire investment universe used (pulling all HSTECH equities and the top 30 by market cap from commodity and materials combined):
 
 <details>
 <summary>Toggle Here</summary>
